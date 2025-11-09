@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('offices', function (Blueprint $table) {
+         Schema::create('offices', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->string('qr_code')->unique();
+            $table->text('description')->nullable();
+            $table->string('location')->nullable();
             $table->timestamps();
         });
     }

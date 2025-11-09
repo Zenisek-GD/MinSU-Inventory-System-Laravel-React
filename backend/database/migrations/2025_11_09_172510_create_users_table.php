@@ -16,7 +16,7 @@ return new class extends Migration
         $table->string('name');
         $table->string('email')->unique();
         $table->string('password');
-        $table->string('role')->default('staff'); // admin, manager, staff, etc.
+        $table->string('role')->default('user'); 
         $table->foreignId('office_id')->nullable()->constrained()->onDelete('set null');
         $table->boolean('is_active')->default(true);
         $table->timestamp('email_verified_at')->nullable();
