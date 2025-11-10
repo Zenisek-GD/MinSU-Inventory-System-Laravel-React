@@ -15,7 +15,7 @@ class AuthController extends Controller
     use ApiResponses;
 
     /**
-     *  Register a new user
+     * Register a new user
      */
     public function register(RegisterUserRequest $request)
     {
@@ -24,8 +24,8 @@ class AuthController extends Controller
         $user = User::create([
             'name'     => $validated['name'],
             'email'    => $validated['email'],
-            'password' => bcrypt($validated['password']),
-            'role'     => $request->role ?? 'user', // optional role input
+            'password' => $validated['password'], // Raw password - model handles hashing
+            'role'     => $validated['role'] ?? 'user',
         ]);
 
         $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
@@ -45,18 +45,12 @@ class AuthController extends Controller
         $validated = $request->validated();
 
         $user = User::where('email', $validated['email'])->first();
-
+        
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return $this->error('Invalid email or password', 401);
         }
 
-        if (isset($user->is_active) && !$user->is_active) {
-            return $this->error('Account is deactivated', 403);
-        }
-
-        // delete old tokens before issuing new one
         $user->tokens()->delete();
-
         $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
 
         return $this->ok('Login successful', [
@@ -77,7 +71,7 @@ class AuthController extends Controller
     }
 
     /**
-     *  Fetch current user profile
+     * Fetch current user profile
      */
     public function profile(Request $request)
     {
