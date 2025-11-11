@@ -13,6 +13,9 @@ class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
+    const ROLE_ADMIN = 'admin';
+    const ROLE_SUPPLY_OFFICER = 'supply_officer';
+    const ROLE_STAFF = 'staff';
 
     /**
      * The attributes that are mass assignable.
@@ -59,11 +62,35 @@ class User extends Authenticatable
         return $this->belongsTo(Office::class);
     }
 
-    /**
-     * Automatically hash password when setting.
-     */
-    /*public function setPasswordAttribute($value)
+   // Role checking methods
+    public function isAdmin(): bool
     {
-        $this->attributes['password'] = bcrypt($value);
-    }*/
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isSupplyOfficer(): bool
+    {
+        return $this->role === self::ROLE_SUPPLY_OFFICER;
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->role === self::ROLE_STAFF;
+    }
+
+    // Scope methods
+    public function scopeAdmins($query)
+    {
+        return $query->where('role', self::ROLE_ADMIN);
+    }
+
+    public function scopeSupplyOfficers($query)
+    {
+        return $query->where('role', self::ROLE_SUPPLY_OFFICER);
+    }
+
+    public function scopeStaff($query)
+    {
+        return $query->where('role', self::ROLE_STAFF);
+    }
 }

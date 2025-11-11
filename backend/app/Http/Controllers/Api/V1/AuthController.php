@@ -24,14 +24,15 @@ class AuthController extends Controller
         $user = User::create([
             'name'     => $validated['name'],
             'email'    => $validated['email'],
-            'password' => $validated['password'], // Raw password - model handles hashing
-            'role'     => $validated['role'] ?? 'user',
+            'password' => $validated['password'],
+            'role'     => $validated['role'] ?? 'staff', // Default to 'staff'
+            'office_id' => $validated['office_id'] ?? null, // Add office_id if needed
         ]);
 
         $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
 
         return $this->ok('User registered successfully', [
-            'user'  => $user,
+            'user'  => $user->load('office'), // Eager load office relationship
             'token' => $token,
             'role'  => $user->role,
         ]);
@@ -44,12 +45,13 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
 
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::with('office')->where('email', $validated['email'])->first();
         
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return $this->error('Invalid email or password', 401);
         }
 
+        // Delete existing tokens and create new one
         $user->tokens()->delete();
         $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
 
@@ -75,8 +77,52 @@ class AuthController extends Controller
      */
     public function profile(Request $request)
     {
+        $user = $request->user()->load('office');
+        
         return $this->ok('User profile retrieved successfully', [
-            'user' => $request->user(),
+            'user' => $user,
         ]);
+    }
+
+    /**
+     * Update user profile
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
+        ]);
+
+        $user->update($validated);
+
+        return $this->ok('Profile updated successfully', [
+            'user' => $user->fresh('office'),
+        ]);
+    }
+
+    /**
+     * Change password
+     */
+    public function changePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return $this->error('Current password is incorrect', 422);
+        }
+
+        $user->update([
+            'password' => $validated['password']
+        ]);
+
+        return $this->ok('Password changed successfully');
     }
 }

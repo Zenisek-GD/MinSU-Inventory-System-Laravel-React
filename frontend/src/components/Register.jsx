@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,11 +8,27 @@ const Register = () => {
     email: '',
     password: '',
     password_confirmation: '',
-    role: 'user',
+    role: 'staff',
+    office_id: '',
   });
+  const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, user } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch offices for dropdown
+  useEffect(() => {
+    const fetchOffices = async () => {
+      try {
+        const response = await fetch('/api/offices');
+        const data = await response.json();
+        setOffices(data.data || []);
+      } catch (error) {
+        console.error('Error fetching offices:', error);
+      }
+    };
+    fetchOffices();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -23,6 +39,12 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (formData.password !== formData.password_confirmation) {
+      alert('Passwords do not match');
+      return;
+    }
+
     setLoading(true);
 
     const result = await register(formData);
@@ -35,6 +57,15 @@ const Register = () => {
     }
 
     setLoading(false);
+  };
+
+  const getRoleLabel = (role) => {
+    const roleLabels = {
+      admin: 'Administrator',
+      supply_officer: 'Supply Officer',
+      staff: 'Staff Member'
+    };
+    return roleLabels[role] || role;
   };
 
   return (
@@ -90,6 +121,31 @@ const Register = () => {
             </div>
 
             <div>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                Role
+              </label>
+              <select
+                id="role"
+                name="role"
+                required
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                value={formData.role}
+                onChange={handleChange}
+              >
+                <option value="staff">Staff Member</option>
+                <option value="supply_officer">Supply Officer</option>
+                <option value="admin">Administrator</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {getRoleLabel(formData.role)} - {
+                  formData.role === 'admin' ? 'Full system access' :
+                  formData.role === 'supply_officer' ? 'Manages inventory and approvals' :
+                  'Basic system access for daily operations'
+                }
+              </p>
+            </div>
+
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
@@ -98,8 +154,9 @@ const Register = () => {
                 name="password"
                 type="password"
                 required
+                minLength="8"
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your password"
+                placeholder="Enter your password (min. 8 characters)"
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -114,27 +171,12 @@ const Register = () => {
                 name="password_confirmation"
                 type="password"
                 required
+                minLength="8"
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Confirm your password"
                 value={formData.password_confirmation}
                 onChange={handleChange}
               />
-            </div>
-
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                value={formData.role}
-                onChange={handleChange}
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
             </div>
           </div>
 
@@ -163,4 +205,4 @@ const Register = () => {
   );
 };
 
-export default Register;  
+export default Register;
