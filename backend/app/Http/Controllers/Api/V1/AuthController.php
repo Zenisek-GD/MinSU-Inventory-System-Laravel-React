@@ -25,14 +25,14 @@ class AuthController extends Controller
             'name'     => $validated['name'],
             'email'    => $validated['email'],
             'password' => $validated['password'],
-            'role'     => $validated['role'] ?? 'staff', // Default to 'staff'
-            'office_id' => $validated['office_id'] ?? null, // Add office_id if needed
+            'role'     => $validated['role'] ?? 'staff', 
+            'office_id' => $validated['office_id'] ?? null,
         ]);
 
         $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
 
         return $this->ok('User registered successfully', [
-            'user'  => $user->load('office'), // Eager load office relationship
+            'user'  => $user->load('office'), 
             'token' => $token,
             'role'  => $user->role,
         ]);
@@ -70,6 +70,15 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return $this->ok('Successfully logged out');
+    }
+
+    public function roleCounts()
+    {
+        return [
+            'admin' => User::where('role', 'admin')->count(),
+            'supply_officer' => User::where('role', 'supply_officer')->count(),
+            'staff' => User::where('role', 'staff')->count(),
+        ];
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterUserRequest extends FormRequest
@@ -29,4 +30,31 @@ class RegisterUserRequest extends FormRequest
             'role' => 'sometimes|string|in:admin,supply_officer,staff',
         ];
     }
+
+     public function withValidator($validator)
+{
+    $validator->after(function ($validator) {
+        if ($this->has('role') && !$validator->errors()->has('role')) {
+            $role = $this->input('role');
+            
+            // Only restrict admin and supply_officer
+            if ($role === 'admin' && User::where('role', 'admin')->exists()) {
+                $validator->errors()->add('role', 'An administrator already exists. Only one admin is allowed.');
+            }
+
+            if ($role === 'supply_officer' && User::where('role', 'supply_officer')->exists()) {
+                $validator->errors()->add('role', 'A supply officer already exists. Only one supply officer is allowed.');
+            }
+            
+        }  
+    });
+ }
+
+    public function messages()
+    {
+        return [
+            'role.in' => 'The selected role is invalid. Must be one of: admin, supply_officer, staff.',
+        ];
+    }
+
 }

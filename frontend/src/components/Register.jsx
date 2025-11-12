@@ -13,6 +13,11 @@ const Register = () => {
   });
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [roleCounts, setRoleCounts] = useState({
+    admin: 0,
+    supply_officer: 0,
+    staff: 0
+  });
   const { register, user } = useAuth();
   const navigate = useNavigate();
 
@@ -30,6 +35,20 @@ const Register = () => {
     fetchOffices();
   }, []);
 
+  // Fetch existing user counts by role
+  useEffect(() => {
+    const fetchUserCounts = async () => {
+      try {
+        const response = await fetch('/api/users/role-counts');
+        const data = await response.json();
+        setRoleCounts(data);
+      } catch (error) {
+        console.error('Error fetching user counts:', error);
+      }
+    };
+    fetchUserCounts();
+  }, []);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -37,27 +56,38 @@ const Register = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (formData.password !== formData.password_confirmation) {
-      alert('Passwords do not match');
-      return;
-    }
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (formData.password !== formData.password_confirmation) {
+    alert('Passwords do not match');
+    return;
+  }
 
-    setLoading(true);
+  // Double-check role availability before submitting
+  if (!isRoleAvailable(formData.role)) {
+    alert(`A ${getRoleLabel(formData.role)} already exists. Only one ${getRoleLabel(formData.role)} is allowed.`);
+    return;
+  }
 
-    const result = await register(formData);
-    
-    if (!result.success) {
-      alert(result.error);
+  setLoading(true);
+
+  const result = await register(formData);
+  
+  if (!result.success) {
+    // Handle validation errors from backend
+    if (result.errors && result.errors.role) {
+      alert(result.errors.role[0]); // Show the specific role error
     } else {
-      alert('Registration successful! Please login with your credentials.');
-      navigate('/login');
+      alert(result.error || 'Registration failed');
     }
+  } else {
+    alert('Registration successful! Please login with your credentials.');
+    navigate('/login');
+  }
 
-    setLoading(false);
-  };
+  setLoading(false);
+};
 
   const getRoleLabel = (role) => {
     const roleLabels = {
@@ -67,6 +97,33 @@ const Register = () => {
     };
     return roleLabels[role] || role;
   };
+
+  const getRoleDescription = (role) => {
+    const descriptions = {
+      admin: 'Full system access',
+      supply_officer: 'Manages inventory and approvals',
+      staff: 'Basic system access for daily operations'
+    };
+    return descriptions[role] || '';
+  };
+
+  // Check if role is available
+  const isRoleAvailable = (role) => {
+    if (role === 'admin') {
+      return roleCounts.admin === 0;
+    }
+    if (role === 'supply_officer') {
+      return roleCounts.supply_officer === 0;
+    }
+    return true; // Staff role is always available
+  };
+
+  // Get available roles for dropdown
+  const availableRoles = [
+    { value: 'staff', label: 'Staff Member', available: true },
+    { value: 'supply_officer', label: 'Supply Officer', available: isRoleAvailable('supply_officer') },
+    { value: 'admin', label: 'Administrator', available: isRoleAvailable('admin') }
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -132,16 +189,21 @@ const Register = () => {
                 value={formData.role}
                 onChange={handleChange}
               >
-                <option value="staff">Staff Member</option>
-                <option value="supply_officer">Supply Officer</option>
-                <option value="admin">Administrator</option>
+                {availableRoles.map((role) => (
+                  <option 
+                    key={role.value} 
+                    value={role.value}
+                    disabled={!role.available}
+                  >
+                    {role.label} {!role.available ? '(Already exists)' : ''}
+                  </option>
+                ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                {getRoleLabel(formData.role)} - {
-                  formData.role === 'admin' ? 'Full system access' :
-                  formData.role === 'supply_officer' ? 'Manages inventory and approvals' :
-                  'Basic system access for daily operations'
-                }
+                {getRoleLabel(formData.role)} - {getRoleDescription(formData.role)}
+                {!isRoleAvailable(formData.role) && (
+                  <span className="text-red-500 font-medium"> - This role already exists and cannot be assigned again</span>
+                )}
               </p>
             </div>
 
@@ -183,7 +245,7 @@ const Register = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isRoleAvailable(formData.role)}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
