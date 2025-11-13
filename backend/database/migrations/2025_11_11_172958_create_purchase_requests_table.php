@@ -26,19 +26,7 @@ return new class extends Migration
         });
 
 
-        Schema::create('purchase_request_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('purchase_request_id')->constrained()->onDelete('cascade');
-            $table->string('item_name');
-            $table->text('description')->nullable();
-            $table->integer('quantity')->default(1);
-            $table->string('unit')->default('pcs');
-            $table->decimal('estimated_unit_price', 10, 2)->default(0.00);
-            $table->decimal('estimated_total_price', 10, 2)->default(0.00);
-            $table->enum('urgency', ['Low', 'Medium', 'High', 'Critical'])->default('Medium');
-            $table->text('specifications')->nullable();
-            $table->timestamps();
-        });
+        
     }
 
     /**
@@ -46,7 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('purchase_request_items');
         Schema::dropIfExists('purchase_requests');
     }
 };
