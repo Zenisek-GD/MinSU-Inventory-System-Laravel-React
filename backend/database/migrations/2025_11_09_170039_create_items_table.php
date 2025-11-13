@@ -12,7 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('items', function (Blueprint $table) {
-            $table->id();
+              $table->id();
+            $table->string('name');
+            $table->text('description')->nullable();
+              $table->unsignedBigInteger('category_id');
+            $table->string('qr_code')->unique();
+            $table->string('serial_number')->nullable();
+            $table->enum('condition', ['Excellent', 'Good', 'Fair', 'Needs Repair', 'Damaged', 'Disposed'])->default('Good');
+            $table->enum('status', ['Available', 'Borrowed', 'Under Maintenance', 'Lost', 'Disposed'])->default('Available');
+            $table->foreignId('office_id')->constrained()->onDelete('cascade');
+            $table->date('purchase_date')->nullable();
+            $table->decimal('purchase_price', 10, 2)->nullable();
+            $table->date('warranty_expiry')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
