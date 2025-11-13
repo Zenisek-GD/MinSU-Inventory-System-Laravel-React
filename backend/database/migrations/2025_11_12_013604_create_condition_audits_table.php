@@ -12,8 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('condition_audits', function (Blueprint $table) {
-            $table->id();
+             $table->id();
+            $table->foreignId('item_id')->constrained()->onDelete('cascade');
+            $table->foreignId('checked_by')->constrained('users')->onDelete('cascade');
+            $table->year('audit_year');
+            $table->enum('condition', ['Excellent', 'Good', 'Fair', 'Needs Repair', 'Damaged', 'Disposed']);
+            $table->text('remarks')->nullable();
+            $table->text('recommendations')->nullable();
+            $table->date('next_audit_date')->nullable();
             $table->timestamps();
+
+            $table->unique(['item_id', 'audit_year']);
         });
     }
 
