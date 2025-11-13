@@ -8,40 +8,27 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  timeout: 15000,
+  withCredentials: true,
+
 });
 
-// Request interceptor - add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
-// Response interceptor - handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle token expiration
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
 
-    // Handle validation errors
     if (error.response?.status === 422) {
       const validationErrors = error.response?.data?.errors;
       if (validationErrors) {
         const errorMessages = Object.values(validationErrors).flat().join(', ');
-        alert(`Validation Error: ${errorMessages}`);
+        console.error('Validation Error:', errorMessages);
       }
     }
 
@@ -49,12 +36,12 @@ api.interceptors.response.use(
   }
 );
 
-// API methods
 export const authAPI = {
   register: (userData) => api.post('/register', userData),
   login: (credentials) => api.post('/login', credentials),
   logout: () => api.post('/logout'),
   profile: () => api.get('/profile'),
+  getCsrfCookie: () => api.get('/sanctum/csrf-cookie'),
 };
 
 export default api;

@@ -10,12 +10,18 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        
     )
     ->withMiddleware(function (Middleware $middleware): void {
         //
+        $middleware->statefulApi();
+
          $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
+
+        //$middleware->alias([
+        //'role' => \App\Http\Middle\RoleMiddleware::class, ]);
         
     })
     ->withExceptions(function (Exceptions $exceptions): void {

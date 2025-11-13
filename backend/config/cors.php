@@ -15,11 +15,11 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],//'login','logout'
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // You can change this to specific origins like ['http://localhost:5173']
+    'allowed_origins' => [env("FRONTEND_URL")],  //env('FRONTEND_URL')
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +29,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

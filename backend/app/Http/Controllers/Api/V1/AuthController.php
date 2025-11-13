@@ -7,8 +7,10 @@ use App\Http\Requests\Api\V1\LoginUserRequest;
 use App\Http\Requests\Api\V1\RegisterUserRequest;
 use App\Models\User;
 use App\Traits\ApiResponses;
+use Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
@@ -17,49 +19,58 @@ class AuthController extends Controller
     /**
      * Register a new user
      */
-    public function register(RegisterUserRequest $request)
+     public function register(RegisterUserRequest $request)
     {
-        $validated = $request->validated();
+        try {
+            $validated = $request->validated();
 
-        $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => $validated['password'],
-            'role'     => $validated['role'] ?? 'staff', 
-            'office_id' => $validated['office_id'] ?? null,
-        ]);
+            $user = User::create([
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role'     => $validated['role'] ?? 'staff', 
+                'office_id' => $validated['office_id'] ?? null,
+            ]);
 
-        $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
+            // Create token with abilities
+            $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
 
-        return $this->ok('User registered successfully', [
-            'user'  => $user->load('office'), 
-            'token' => $token,
-            'role'  => $user->role,
-        ]);
+            return $this->ok('User registered successfully', [
+                'user'  => $user->load('office'), 
+                'token' => $token,
+                'role'  => $user->role,
+            ]);
+        } catch (\Exception $e) {
+            return $this->error('Registration failed: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
      * Login existing user
      */
-    public function login(LoginUserRequest $request)
+     public function login(LoginUserRequest $request)
     {
-        $validated = $request->validated();
+        try {
+            $validated = $request->validated();
 
-        $user = User::with('office')->where('email', $validated['email'])->first();
-        
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
-            return $this->error('Invalid email or password', 401);
+            $user = User::with('office')->where('email', $validated['email'])->first();
+            
+            if (!$user || !Hash::check($validated['password'], $user->password)) {
+                return $this->error('Invalid email or password', 401);
+            }
+
+            // Delete existing tokens and create new one
+            $user->tokens()->delete();
+            $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
+
+            return $this->ok('Login successful', [
+                'user'  => $user,
+                'token' => $token,
+                'role'  => $user->role,
+            ]);
+        } catch (\Exception $e) {
+            return $this->error('Login failed: ' . $e->getMessage(), 500);
         }
-
-        // Delete existing tokens and create new one
-        $user->tokens()->delete();
-        $token = $user->createToken('auth_token', [$user->role])->plainTextToken;
-
-        return $this->ok('Login successful', [
-            'user'  => $user,
-            'token' => $token,
-            'role'  => $user->role,
-        ]);
     }
 
     /**
@@ -68,8 +79,15 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
+        
 
-        return $this->ok('Successfully logged out');
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        $cookie = cookie()->forget('auth_token');
+
+        return $this->ok('Logged out successfully')->withCookie($cookie);
     }
 
     public function roleCounts()
