@@ -10,40 +10,89 @@ class CategoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+     public function index()
     {
-        //
+        $categories = Category::with('parent', 'children')
+            ->whereNull('parent_id')
+            ->withCount('items')
+            ->get();
+            
+        return response()->json($categories);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'parent_id' => 'nullable|exists:categories,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $category = Category::create($request->all());
+
+        return response()->json([
+            'message' => 'Category created successfully',
+            'category' => $category
+        ], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Category $category)
     {
-        //
+        $category->load(['parent', 'children', 'items.office']);
+        
+        return response()->json($category);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Category $category)
     {
-        //
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'parent_id' => 'nullable|exists:categories,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Prevent circular reference
+        if ($request->parent_id == $category->id) {
+            return response()->json([
+                'message' => 'Category cannot be its own parent'
+            ], 422);
+        }
+
+        $category->update($request->all());
+
+        return response()->json([
+            'message' => 'Category updated successfully',
+            'category' => $category
+        ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Category $category)
     {
-        //
+        if ($category->items()->count() > 0) {
+            return response()->json([
+                'message' => 'Cannot delete category with associated items'
+            ], 422);
+        }
+
+        // Update child categories to null parent
+        Category::where('parent_id', $category->id)->update(['parent_id' => null]);
+
+        $category->delete();
+
+        return response()->json(['message' => 'Category deleted successfully']);
     }
 }
