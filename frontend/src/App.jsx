@@ -1,73 +1,26 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './components/Login';
-import Register from './components/Register';
-import Profile from './components/Profile';
-import { authAPI } from './services/api';
+import React, { useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import api from "./api/axios";
 
 const App = () => {
-  useEffect(() => {
-
-    authAPI.getCsrfCookie().catch(() => {});
-  }, []);
-
-  const ProtectedRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
-    
-    if (loading) {
-      return <div>Loading...</div>;
-    }
-    
-    return isAuthenticated ? children : <Navigate to="/login" />;
-  };
-
-  const PublicRoute = ({ children }) => {
-    const { isAuthenticated, loading } = useAuth();
-    
-    if (loading) {
-      return <div>Loading...</div>;
-    }
-    
-    return !isAuthenticated ? children : <Navigate to="/profile" />;
-  };
+ useEffect(() => {
+  api.get("http://localhost:8000/sanctum/csrf-cookie", { withCredentials: true }).catch(() => {});
+}, []);
 
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>       
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } 
-          />
-          
-          <Route 
-            path="/register" 
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            } 
-          />
-          
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route path="/" element={<Navigate to="/profile" />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </Router>
   );
-}
+};
 
 export default App;
+
