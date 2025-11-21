@@ -24,6 +24,8 @@ Route::prefix('v1')->group(function () {
 
         // Office resource routes
         Route::apiResource('offices', OfficeController::class);
+        // User resource routes
+        Route::apiResource('users', \App\Http\Controllers\Api\V1\UserController::class);
         // Item resource routes
         Route::apiResource('items', ItemController::class);
         // PurchaseRequest resource routes

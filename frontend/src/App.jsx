@@ -7,6 +7,7 @@ import SupplyOfficerDashboard from "./pages/Dashboard/SupplyOfficerDashboard";
 import StaffDashboard from "./pages/Dashboard/StaffDashboard";
 import Loading from "./components/common/Loading";
 import OfficesPage from "./pages/Offices";
+import UsersPage from "./pages/Users";
 import { UserProvider, useUser } from "./context/UserContext";
 
 // ...existing code...
@@ -45,10 +46,20 @@ const AppRoutes = () => {
         } />
         <Route path="/offices" element={
           <ProtectedRoute>
-            {/* Only admin should access this page, you can add a check inside OfficesPage if needed */}
             {user && user.role === 'admin' ? (
               <React.Suspense fallback={<Loading />}>
                 <OfficesPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/users" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <UsersPage />
               </React.Suspense>
             ) : (
               <Navigate to="/dashboard" />
