@@ -8,9 +8,12 @@ import StaffDashboard from "./pages/Dashboard/StaffDashboard";
 import Loading from "./components/common/Loading";
 import OfficesPage from "./pages/Offices";
 import UsersPage from "./pages/Users";
-import { UserProvider, useUser } from "./context/UserContext";
+import CategoriesPage from "./pages/Categories";
+import ItemsPage from "./pages/Items";
 
-// ...existing code...
+import InventoryPage from "./pages/Inventory";
+
+import { UserProvider, useUser } from "./context/UserContext.jsx";
 
 // AppRoutes uses the user context
 const AppRoutes = () => {
@@ -66,6 +69,39 @@ const AppRoutes = () => {
             )}
           </ProtectedRoute>
         } />
+        <Route path="/categories" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <CategoriesPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/items" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <ItemsPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/inventory" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <InventoryPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" />} />
         {/* 404 Route */}
         <Route path="*" element={
@@ -74,7 +110,6 @@ const AppRoutes = () => {
             <p>The page you're looking for doesn't exist.</p>
           </div>
         } />
-      import OfficesPage from "./pages/Offices";
       </Routes>
     </Router>
   );

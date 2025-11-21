@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\OfficeController;
+use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\PurchaseRequestController;
 
@@ -24,6 +25,8 @@ Route::prefix('v1')->group(function () {
 
         // Office resource routes
         Route::apiResource('offices', OfficeController::class);
+        // Category resource routes
+        Route::apiResource('categories', CategoryController::class);
         // User resource routes
         Route::apiResource('users', \App\Http\Controllers\Api\V1\UserController::class);
         // Item resource routes

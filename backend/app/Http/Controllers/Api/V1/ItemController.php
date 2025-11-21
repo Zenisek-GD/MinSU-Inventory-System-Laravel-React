@@ -11,7 +11,7 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::with(['office', 'category', 'currentBorrow.user']);
+        $query = Item::with(['office', 'category']);
 
         // Filter by office
         if ($request->has('office_id')) {
@@ -35,7 +35,7 @@ class ItemController extends Controller
 
         $items = $query->latest()->get();
 
-        return response()->json($items);
+        return response()->json(['data' => $items]);
     }
 
     public function store(Request $request)
@@ -64,9 +64,18 @@ class ItemController extends Controller
         $qrCode = 'ITEM-' . strtoupper(uniqid());
 
         $item = Item::create([
-            ...$request->all(),
+            'name' => $request->name,
+            'description' => $request->description,
+            'category_id' => $request->category_id,
             'qr_code' => $qrCode,
-            'status' => 'Available'
+            'serial_number' => $request->serial_number,
+            'condition' => $request->condition,
+            'status' => $request->status ?? 'Available',
+            'office_id' => $request->office_id,
+            'purchase_date' => $request->purchase_date,
+            'purchase_price' => $request->purchase_price,
+            'warranty_expiry' => $request->warranty_expiry,
+            'notes' => $request->notes,
         ]);
 
         $item->load(['office', 'category']);
@@ -80,28 +89,28 @@ class ItemController extends Controller
     public function show(Item $item)
     {
         $item->load([
-            'office', 
-            'category', 
-            'borrowRecords.user', 
+            'office',
+            'category',
+            'borrowRecords.user',
             'conditionAudits.checkedBy',
             'currentBorrow.user'
         ]);
-        
+
         return response()->json($item);
     }
 
     public function showByQr($qr_code)
     {
         $item = Item::with([
-            'office', 
-            'category', 
-            'borrowRecords.user', 
-            'conditionAudits' => function($query) {
+            'office',
+            'category',
+            'borrowRecords.user',
+            'conditionAudits' => function ($query) {
                 $query->latest()->limit(5);
             },
             'currentBorrow.user'
         ])->where('qr_code', $qr_code)->firstOrFail();
-        
+
         return response()->json($item);
     }
 
@@ -153,12 +162,12 @@ class ItemController extends Controller
     //public function generateQr(Item $item)
     //{
     //    $qrCode = QrCode::size(300)->generate($item->qr_code);
-        
+
     //    return response()->json([
     //        'qr_code' => $item->qr_code,
     //        'qr_image' => $qrCode
     //    ]);
-   // }
+    // }
 
 
 }

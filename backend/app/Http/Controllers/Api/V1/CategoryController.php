@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
@@ -13,14 +13,14 @@ class CategoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-     public function index()
+    public function index()
     {
         $categories = Category::with('parent', 'children')
             ->whereNull('parent_id')
             ->withCount('items')
             ->get();
-            
-        return response()->json($categories);
+
+        return response()->json(['data' => $categories]);
     }
 
     public function store(Request $request)
@@ -49,7 +49,7 @@ class CategoryController extends Controller
     public function show(Category $category)
     {
         $category->load(['parent', 'children', 'items.office']);
-        
+
         return response()->json($category);
     }
 
