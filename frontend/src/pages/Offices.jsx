@@ -35,11 +35,11 @@ const OfficesPage = () => {
     e.preventDefault();
     if (!newOffice.trim()) return;
     try {
-      await createOffice({ name: newOffice, description: newDescription, location: newLocation });
+      const created = await createOffice({ name: newOffice, description: newDescription, location: newLocation });
+      setOffices(prev => [...prev, created.data.data]);
       setNewOffice("");
       setNewDescription("");
       setNewLocation("");
-      loadOffices();
     } catch {
       setError("Failed to create office");
     }
@@ -54,12 +54,12 @@ const OfficesPage = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await updateOffice(id, { name: editName, description: editDescription, location: editLocation });
+      const updated = await updateOffice(id, { name: editName, description: editDescription, location: editLocation });
+      setOffices(prev => prev.map(o => o.id === id ? updated.data.data : o));
       setEditing(null);
       setEditName("");
       setEditDescription("");
       setEditLocation("");
-      loadOffices();
     } catch {
       setError("Failed to update office");
     }
@@ -69,7 +69,7 @@ const OfficesPage = () => {
     if (!window.confirm("Delete this office?")) return;
     try {
       await deleteOffice(id);
-      loadOffices();
+      setOffices(prev => prev.filter(o => o.id !== id));
     } catch {
       setError("Failed to delete office");
     }

@@ -51,6 +51,7 @@ const ItemsPage = () => {
   }, []);
 
   const loadAll = async () => {
+    console.log('loadAll called');
     setLoading(true);
     try {
       const [itemData, catData, officeData] = await Promise.all([
@@ -71,9 +72,12 @@ const ItemsPage = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await createItem(newItem);
-      setNewItem({ name: "", description: "", category_id: "", office_id: "", status: "available" });
-      loadAll();
+      const result = await createItem(newItem);
+      setItems(prev => [result.item, ...prev]);
+      setNewItem({
+        name: "", description: "", category_id: "", office_id: "", status: "available",
+        serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
+      });
     } catch {
       setError("Failed to create item");
     }
@@ -92,10 +96,13 @@ const ItemsPage = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await updateItem(id, editItem);
+      const result = await updateItem(id, editItem);
+      setItems(prev => prev.map(item => item.id === id ? result.item : item));
       setEditing(null);
-      setEditItem({ name: "", description: "", category_id: "", office_id: "", status: "available" });
-      loadAll();
+      setEditItem({
+        name: "", description: "", category_id: "", office_id: "", status: "available",
+        serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
+      });
     } catch {
       setError("Failed to update item");
     }
@@ -105,7 +112,7 @@ const ItemsPage = () => {
     if (!window.confirm("Delete this item?")) return;
     try {
       await deleteItem(id);
-      loadAll();
+      setItems(prev => prev.filter(item => item.id !== id));
     } catch {
       setError("Failed to delete item");
     }

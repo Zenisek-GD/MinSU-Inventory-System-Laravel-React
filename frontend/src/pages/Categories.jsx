@@ -30,9 +30,9 @@ const CategoriesPage = () => {
     e.preventDefault();
     if (!newCategory.trim()) return;
     try {
-      await createCategory({ name: newCategory });
+      const result = await createCategory({ name: newCategory });
+      setCategories(prev => [result.category, ...prev]);
       setNewCategory("");
-      loadCategories();
     } catch {
       setError("Failed to create category");
     }
@@ -45,10 +45,10 @@ const CategoriesPage = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await updateCategory(id, { name: editName });
+      const result = await updateCategory(id, { name: editName });
+      setCategories(prev => prev.map(cat => cat.id === id ? result.category : cat));
       setEditing(null);
       setEditName("");
-      loadCategories();
     } catch {
       setError("Failed to update category");
     }
@@ -58,7 +58,7 @@ const CategoriesPage = () => {
     if (!window.confirm("Delete this category?")) return;
     try {
       await deleteCategory(id);
-      loadCategories();
+      setCategories(prev => prev.filter(cat => cat.id !== id));
     } catch {
       setError("Failed to delete category");
     }

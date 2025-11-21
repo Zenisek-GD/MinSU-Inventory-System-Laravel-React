@@ -21,6 +21,7 @@ const UsersPage = () => {
   }, []);
 
   const loadUsers = async () => {
+    console.log('loadUsers called');
     setLoading(true);
     try {
       const data = await fetchUsers();
@@ -35,9 +36,9 @@ const UsersPage = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await createUser(newUser);
+      const created = await createUser(newUser);
+      setUsers(prev => [...prev, created.data.data]);
       setNewUser({ name: "", email: "", password: "", role: "staff" });
-      loadUsers();
     } catch {
       setError("Failed to create user");
     }
@@ -55,10 +56,10 @@ const UsersPage = () => {
 
   const handleUpdate = async (id) => {
     try {
-      await updateUser(id, editUser);
+      const updated = await updateUser(id, editUser);
+      setUsers(prev => prev.map(u => u.id === id ? updated.data.data : u));
       setEditing(null);
       setEditUser({ name: "", email: "", role: "staff", is_active: true });
-      loadUsers();
     } catch {
       setError("Failed to update user");
     }
@@ -68,7 +69,7 @@ const UsersPage = () => {
     if (!window.confirm("Delete this user?")) return;
     try {
       await deleteUser(id);
-      loadUsers();
+      setUsers(prev => prev.filter(u => u.id !== id));
     } catch {
       setError("Failed to delete user");
     }

@@ -13,6 +13,7 @@ const InventoryPage = () => {
 
   useEffect(() => {
     loadAll();
+    // Only fetch once on mount
   }, []);
 
   const loadAll = async () => {
