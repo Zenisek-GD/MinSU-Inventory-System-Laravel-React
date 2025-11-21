@@ -1,3 +1,6 @@
+import ItemsPage from "./pages/Items";
+import CategoriesPage from "./pages/Categories";
+import UsersPage from "./pages/Users";
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -6,11 +9,9 @@ import AdminDashboard from "./pages/Dashboard/AdminDashboard";
 import SupplyOfficerDashboard from "./pages/Dashboard/SupplyOfficerDashboard";
 import StaffDashboard from "./pages/Dashboard/StaffDashboard";
 import Loading from "./components/common/Loading";
-import OfficesPage from "./pages/Offices";
-import UsersPage from "./pages/Users";
-import CategoriesPage from "./pages/Categories";
-import ItemsPage from "./pages/Items";
 
+import OfficesPage from "./pages/Offices";
+import PurchaseRequestsPage from "./pages/PurchaseRequests";
 import InventoryPage from "./pages/Inventory";
 
 import { UserProvider, useUser } from "./context/UserContext.jsx";
@@ -52,6 +53,17 @@ const AppRoutes = () => {
             {user && user.role === 'admin' ? (
               <React.Suspense fallback={<Loading />}>
                 <OfficesPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/purchase-requests" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <PurchaseRequestsPage />
               </React.Suspense>
             ) : (
               <Navigate to="/dashboard" />
