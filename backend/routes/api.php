@@ -33,5 +33,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('items', ItemController::class);
         // PurchaseRequest resource routes
         Route::apiResource('purchase-requests', PurchaseRequestController::class);
+        // Borrow resource routes
+        Route::apiResource('borrows', \App\Http\Controllers\Api\V1\BorrowController::class);
     });
 });

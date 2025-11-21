@@ -1,3 +1,4 @@
+import BorrowsPage from "./pages/Borrows";
 import ItemsPage from "./pages/Items";
 import CategoriesPage from "./pages/Categories";
 import UsersPage from "./pages/Users";
@@ -41,6 +42,19 @@ const AppRoutes = () => {
   return (
     <Router>
       <Routes>
+        <Route path="/borrows" element={
+          <ProtectedRoute>
+            <>
+              {user && user.role === 'admin' ? (
+                <React.Suspense fallback={<Loading />}>
+                  <BorrowsPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={

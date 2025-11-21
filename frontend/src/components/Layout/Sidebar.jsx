@@ -52,7 +52,7 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         { path: '/items', icon: <ItemsIcon />, label: 'Manage Items', roles: ['admin'] },
         { path: '/categories', icon: <CategoryIcon />, label: 'Categories', roles: ['admin'] },
         { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['admin'] },
-        { path: '/borrow-requests', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
         { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['admin'] },
         { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['admin'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['admin'] },
@@ -63,7 +63,7 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
       return [
         ...baseItems,
         { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['supply_officer'] },
-        { path: '/borrow-requests', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
         { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['supply_officer'] },
         { path: '/items', icon: <ItemsIcon />, label: 'Item Catalog', roles: ['supply_officer'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['supply_officer'] },
