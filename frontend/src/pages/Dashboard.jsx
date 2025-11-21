@@ -1,27 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { getProfile, logout } from "../api/Auth";
+import { logout } from "../api/Auth";
+import { useUser } from "../context/UserContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const res = await getProfile();
-        console.log("Profile loaded:", res.data);
-        setUser(res.data.user);
-      } catch (err) {
-        console.error("Unauthorized or session expired:", err);
-        navigate("/login");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadUser();
-  }, []);
+  const { user, loading } = useUser();
 
   const handleLogout = async () => {
     await logout();
@@ -29,6 +13,10 @@ export default function Dashboard() {
   };
 
   if (loading) return <div>Loading...</div>;
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
 
   return (
     <div className="p-6">

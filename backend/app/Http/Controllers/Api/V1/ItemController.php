@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Item;
 use Illuminate\Http\Request;
+use Validator;
 
 class ItemController extends Controller
 {
@@ -148,15 +150,15 @@ class ItemController extends Controller
         return response()->json(['message' => 'Item deleted successfully']);
     }
 
-    public function generateQr(Item $item)
-    {
-        $qrCode = QrCode::size(300)->generate($item->qr_code);
+    //public function generateQr(Item $item)
+    //{
+    //    $qrCode = QrCode::size(300)->generate($item->qr_code);
         
-        return response()->json([
-            'qr_code' => $item->qr_code,
-            'qr_image' => $qrCode
-        ]);
-    }
+    //    return response()->json([
+    //        'qr_code' => $item->qr_code,
+    //        'qr_image' => $qrCode
+    //    ]);
+   // }
 
 
 }

@@ -56,7 +56,6 @@ class AuthController extends Controller
                 return $this->error('Invalid email or password', 401);
             }
 
-            // Regenerate session for security
             $request->session()->regenerate();
 
             $user = Auth::user()->load('office');
