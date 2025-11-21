@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Office;
@@ -9,12 +9,23 @@ use Illuminate\Support\Facades\Validator;
 
 class OfficeController extends Controller
 {
-   
+
     public function index()
     {
         $offices = Office::withCount(['users', 'items'])->get();
-        
-        return response()->json($offices);
+        // Ensure qr_code is included in the response for each office
+        $offices = $offices->map(function ($office) {
+            return [
+                'id' => $office->id,
+                'name' => $office->name,
+                'description' => $office->description,
+                'location' => $office->location,
+                'qr_code' => $office->qr_code,
+                'users_count' => $office->users_count,
+                'items_count' => $office->items_count,
+            ];
+        });
+        return response()->json(['data' => $offices]);
     }
 
     public function store(Request $request)
@@ -51,7 +62,7 @@ class OfficeController extends Controller
     public function show(Office $office)
     {
         $office->load(['users', 'items.category', 'purchaseRequests']);
-        
+
         return response()->json($office);
     }
 

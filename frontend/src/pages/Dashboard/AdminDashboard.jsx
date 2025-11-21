@@ -1,5 +1,6 @@
 // src/pages/AdminDashboard.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { fetchDashboardStats } from '../../api/dashboard';
 import DashboardLayout from '../../components/Layout/DashboardLayout';
 import {
   Grid,
@@ -121,41 +122,59 @@ const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const quickStats = [
+  useEffect(() => {
+    const loadStats = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchDashboardStats();
+        setStats(data);
+      } catch (err) {
+        setError('Failed to load dashboard stats');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStats();
+  }, []);
+
+  const quickStats = stats ? [
     {
       title: 'Total Users',
-      value: '156',
+      value: (stats.users.admin + stats.users.supply_officer + stats.users.staff),
       icon: <UsersIcon fontSize="inherit" />,
       subtitle: 'Active members',
-      trend: '+3.2%',
+      trend: '',
       onClick: () => navigate('/users')
     },
     {
       title: 'Departments',
-      value: '24',
+      value: stats.offices.length,
       icon: <OfficeIcon fontSize="inherit" />,
       subtitle: 'Managed offices',
-      trend: '+2',
+      trend: '',
       onClick: () => navigate('/offices')
     },
     {
       title: 'Inventory Items',
-      value: '1,234',
+      value: stats.items.length,
       icon: <ItemsIcon fontSize="inherit" />,
-      subtitle: '12 low stock',
-      trend: '-5.1%',
+      subtitle: '',
+      trend: '',
       onClick: () => navigate('/items')
     },
     {
       title: 'Pending Requests',
-      value: '18',
+      value: stats.purchaseRequests.filter(pr => pr.status === 'Pending').length,
       icon: <PRIcon fontSize="inherit" />,
       subtitle: 'Awaiting approval',
-      trend: '+8',
+      trend: '',
       onClick: () => navigate('/purchase-requests')
     },
-  ];
+  ] : [];
 
   const quickActions = [
     { 
@@ -298,13 +317,19 @@ const AdminDashboard = () => {
         </Box>
 
         {/* Key Metrics */}
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          {quickStats.map((stat, index) => (
-            <Grid item xs={12} sm={6} lg={3} key={index}>
-              <StatCard {...stat} />
-            </Grid>
-          ))}
-        </Grid>
+        {loading ? (
+          <Box sx={{ textAlign: 'center', py: 6 }}>Loading dashboard stats...</Box>
+        ) : error ? (
+          <Box sx={{ textAlign: 'center', color: 'red', py: 6 }}>{error}</Box>
+        ) : (
+          <Grid container spacing={3} sx={{ mb: 6 }}>
+            {quickStats.map((stat, index) => (
+              <Grid item xs={12} sm={6} lg={3} key={index}>
+                <StatCard {...stat} />
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
 <Grid container spacing={4}>
   {/* Quick Actions */}

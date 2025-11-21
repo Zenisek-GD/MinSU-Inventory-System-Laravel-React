@@ -6,6 +6,7 @@ import AdminDashboard from "./pages/Dashboard/AdminDashboard";
 import SupplyOfficerDashboard from "./pages/Dashboard/SupplyOfficerDashboard";
 import StaffDashboard from "./pages/Dashboard/StaffDashboard";
 import Loading from "./components/common/Loading";
+import OfficesPage from "./pages/Offices";
 import { UserProvider, useUser } from "./context/UserContext";
 
 // ...existing code...
@@ -42,6 +43,18 @@ const AppRoutes = () => {
             <RoleBasedDashboard />
           </ProtectedRoute>
         } />
+        <Route path="/offices" element={
+          <ProtectedRoute>
+            {/* Only admin should access this page, you can add a check inside OfficesPage if needed */}
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <OfficesPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
         <Route path="/" element={<Navigate to="/dashboard" />} />
         {/* 404 Route */}
         <Route path="*" element={
@@ -50,6 +63,7 @@ const AppRoutes = () => {
             <p>The page you're looking for doesn't exist.</p>
           </div>
         } />
+      import OfficesPage from "./pages/Offices";
       </Routes>
     </Router>
   );
