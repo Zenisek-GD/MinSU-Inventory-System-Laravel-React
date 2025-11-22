@@ -37,7 +37,7 @@ const UsersPage = () => {
     e.preventDefault();
     try {
       const created = await createUser(newUser);
-      setUsers(prev => [...prev, created.data.data]);
+      setUsers(prev => [...prev, created?.data?.data || created?.data || created || {}]);
       setNewUser({ name: "", email: "", password: "", role: "staff" });
     } catch {
       setError("Failed to create user");
@@ -57,7 +57,7 @@ const UsersPage = () => {
   const handleUpdate = async (id) => {
     try {
       const updated = await updateUser(id, editUser);
-      setUsers(prev => prev.map(u => u.id === id ? updated.data.data : u));
+      setUsers(prev => prev.map(u => u.id === id ? (updated?.data?.data || updated?.data || updated || u) : u));
       setEditing(null);
       setEditUser({ name: "", email: "", role: "staff", is_active: true });
     } catch {

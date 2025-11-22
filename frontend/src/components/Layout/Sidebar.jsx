@@ -26,6 +26,7 @@ import {
   ShoppingCart as CartIcon,
   QrCode as QRIcon,
   History as HistoryIcon,
+  CheckCircle as CheckIcon,
 } from '@mui/icons-material';
 import { useUser } from '../../context/UserContext';
 
@@ -66,6 +67,9 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
         { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['supply_officer'] },
         { path: '/items', icon: <ItemsIcon />, label: 'Item Catalog', roles: ['supply_officer'] },
+        { path: '/monitoring', icon: <ReportsIcon />, label: 'Monitoring', roles: ['supply_officer'] },
+        { path: '/transaction-logs', icon: <HistoryIcon />, label: 'Transaction Logs', roles: ['supply_officer'] },
+        { path: '/return-processing', icon: <CheckIcon />, label: 'Return Processing', roles: ['supply_officer'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['supply_officer'] },
       ];
     }
