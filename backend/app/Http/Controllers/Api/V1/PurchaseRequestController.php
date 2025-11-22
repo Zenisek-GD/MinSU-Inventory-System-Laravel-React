@@ -111,7 +111,7 @@ class PurchaseRequestController extends Controller
     public function show(PurchaseRequest $purchaseRequest)
     {
         $purchaseRequest->load(['office', 'requestedBy', 'approvedBy', 'items']);
-        
+
         return response()->json($purchaseRequest);
     }
 
@@ -205,33 +205,43 @@ class PurchaseRequestController extends Controller
         return response()->json(['message' => 'Purchase request deleted successfully']);
     }
 
-    public function approve(Request $request, PurchaseRequest $purchaseRequest)
+    public function approve(Request $request, PurchaseRequest $purchaseRequestRecord)
     {
-        if ($purchaseRequest->status !== 'Pending') {
+        if ($purchaseRequestRecord->status !== 'Pending') {
             return response()->json([
-                'message' => 'Purchase request is not pending approval'
+                'message' => 'Purchase request is not pending approval',
+                'debug' => [
+                    'purchase_request_id' => $purchaseRequestRecord->id ?? null,
+                    'status' => $purchaseRequestRecord->status ?? null,
+                    'requested_by' => $purchaseRequestRecord->requested_by ?? null,
+                ]
             ], 422);
         }
 
-        $purchaseRequest->update([
+        $purchaseRequestRecord->update([
             'status' => 'Approved',
             'approved_by' => $request->user()->id,
             'approved_at' => now(),
         ]);
 
-        $purchaseRequest->load(['office', 'requestedBy', 'approvedBy', 'items']);
+        $purchaseRequestRecord->load(['office', 'requestedBy', 'approvedBy', 'items']);
 
         return response()->json([
             'message' => 'Purchase request approved successfully',
-            'purchase_request' => $purchaseRequest
+            'purchase_request' => $purchaseRequestRecord
         ]);
     }
 
-    public function reject(Request $request, PurchaseRequest $purchaseRequest)
+    public function reject(Request $request, PurchaseRequest $purchaseRequestRecord)
     {
-        if ($purchaseRequest->status !== 'Pending') {
+        if ($purchaseRequestRecord->status !== 'Pending') {
             return response()->json([
-                'message' => 'Purchase request is not pending approval'
+                'message' => 'Purchase request is not pending approval',
+                'debug' => [
+                    'purchase_request_id' => $purchaseRequestRecord->id ?? null,
+                    'status' => $purchaseRequestRecord->status ?? null,
+                    'requested_by' => $purchaseRequestRecord->requested_by ?? null,
+                ]
             ], 422);
         }
 
@@ -246,14 +256,14 @@ class PurchaseRequestController extends Controller
             ], 422);
         }
 
-        $purchaseRequest->update([
+        $purchaseRequestRecord->update([
             'status' => 'Rejected',
             'notes' => $request->notes,
         ]);
 
         return response()->json([
             'message' => 'Purchase request rejected successfully',
-            'purchase_request' => $purchaseRequest
+            'purchase_request' => $purchaseRequestRecord
         ]);
     }
 }

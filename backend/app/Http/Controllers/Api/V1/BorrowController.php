@@ -96,7 +96,7 @@ class BorrowController extends Controller
     public function show(BorrowRecord $borrowRecord)
     {
         $borrowRecord->load(['item.office', 'item.category', 'borrowedBy.office', 'approvedBy']);
-        
+
         return response()->json($borrowRecord);
     }
 
@@ -147,21 +147,34 @@ class BorrowController extends Controller
 
     public function approve(Request $request, BorrowRecord $borrowRecord)
     {
+
         if ($borrowRecord->status !== 'Pending') {
             return response()->json([
-                'message' => 'Borrow request is not pending approval'
+                'message' => 'Borrow request is not pending approval',
+                'debug' => [
+                    'borrow_id' => $borrowRecord->id,
+                    'status' => $borrowRecord->status,
+                    'item_id' => $borrowRecord->item_id,
+                ]
             ], 422);
         }
 
         DB::beginTransaction();
 
         try {
+
             $item = $borrowRecord->item;
 
             // Check if item is still available
             if ($item->status !== 'Available') {
                 return response()->json([
-                    'message' => 'Item is no longer available'
+                    'message' => 'Item is no longer available',
+                    'debug' => [
+                        'item_id' => $item->id,
+                        'item_status' => $item->status,
+                        'borrow_id' => $borrowRecord->id,
+                        'borrow_status' => $borrowRecord->status,
+                    ]
                 ], 422);
             }
 

@@ -33,7 +33,13 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('items', ItemController::class);
         // PurchaseRequest resource routes
         Route::apiResource('purchase-requests', PurchaseRequestController::class);
+        // Custom approve/reject routes for purchase requests
+        Route::put('purchase-requests/{purchaseRequestRecord}/approve', [PurchaseRequestController::class, 'approve']);
+        Route::put('purchase-requests/{purchaseRequestRecord}/reject', [PurchaseRequestController::class, 'reject']);
         // Borrow resource routes
         Route::apiResource('borrows', \App\Http\Controllers\Api\V1\BorrowController::class);
+        // Custom approve/reject routes for borrows
+        Route::put('borrows/{borrowRecord}/approve', [\App\Http\Controllers\Api\V1\BorrowController::class, 'approve']);
+        Route::put('borrows/{borrowRecord}/reject', [\App\Http\Controllers\Api\V1\BorrowController::class, 'reject']);
     });
 });

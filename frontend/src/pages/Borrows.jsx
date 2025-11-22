@@ -8,6 +8,42 @@ import {
 import { fetchItems } from "../api/item";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import { useUser } from "../context/UserContext";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  TextField,
+  MenuItem,
+  Grid,
+  Chip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Snackbar,
+  Paper,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Avatar,
+} from "@mui/material";
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  CheckCircle as ApproveIcon,
+  Cancel as RejectIcon,
+  Inventory as InventoryIcon,
+  Person as PersonIcon,
+  CalendarToday as DateIcon,
+  Assignment as PurposeIcon,
+  Build as ConditionIcon,
+} from "@mui/icons-material";
 
 const BorrowsPage = () => {
   const [borrows, setBorrows] = useState([]);
@@ -20,7 +56,8 @@ const BorrowsPage = () => {
     purpose: "",
   });
   const [items, setItems] = useState([]);
-  const [notif, setNotif] = useState("");
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useUser();
 
   useEffect(() => {
@@ -59,121 +96,367 @@ const BorrowsPage = () => {
       const result = await createBorrow(form);
       setBorrows((prev) => [result.borrow_record, ...prev]);
       setForm({ item_id: "", borrow_date: "", expected_return_date: "", purpose: "" });
-    } catch {
-      setError("Failed to create borrow record");
+      setDialogOpen(false);
+      showSnackbar("Borrow request submitted successfully", "success");
+    } catch (err) {
+      showSnackbar("Failed to create borrow record", "error");
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this borrow record?")) return;
+    if (!window.confirm("Are you sure you want to delete this borrow record?")) return;
     try {
       await deleteBorrow(id);
       setBorrows((prev) => prev.filter((r) => r.id !== id));
+      showSnackbar("Borrow record deleted successfully", "success");
     } catch {
-      setError("Failed to delete borrow record");
+      showSnackbar("Failed to delete borrow record", "error");
     }
+  };
+
+  const handleStatusUpdate = async (id, status, notes = "") => {
+    try {
+      // Always send notes when rejecting
+      if (status === "Rejected" && !notes) {
+        notes = "Rejected by supply officer";
+      }
+      await updateBorrow(id, { status, ...(status === "Rejected" ? { notes } : {}) });
+      setBorrows((prev) => prev.map(r => r.id === id ? { ...r, status } : r));
+      showSnackbar(`Borrow request ${status.toLowerCase()} successfully`, "success");
+    } catch (err) {
+      const message = err?.response?.data?.message || `Failed to ${status.toLowerCase()} borrow request`;
+      showSnackbar(message, "error");
+    }
+  };
+
+  const showSnackbar = (message, severity) => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Approved": return "success";
+      case "Rejected": return "error";
+      case "Pending": return "warning";
+      case "Returned": return "info";
+      default: return "default";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "Approved": return <ApproveIcon />;
+      case "Rejected": return <RejectIcon />;
+      case "Pending": return <DateIcon />;
+      case "Returned": return <CheckCircle />;
+      default: return <InventoryIcon />;
+    }
+  };
+
+  const isOverdue = (expectedReturnDate) => {
+    return new Date(expectedReturnDate) < new Date();
   };
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Borrow Records</h1>
-        {notif && (
-          <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{notif}</div>
-        )}
-        <form onSubmit={handleSubmit} className="mb-6 border p-4 rounded bg-white">
-          <select
-            className="border px-2 py-1 rounded mb-2 w-full"
-            name="item_id"
-            value={form.item_id}
-            onChange={handleFormChange}
-            required
-          >
-            <option value="">Select Item</option>
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
-          <input
-            className="border px-2 py-1 rounded mb-2 w-full"
-            name="borrow_date"
-            type="date"
-            value={form.borrow_date}
-            onChange={handleFormChange}
-            required
-          />
-          <input
-            className="border px-2 py-1 rounded mb-2 w-full"
-            name="expected_return_date"
-            type="date"
-            value={form.expected_return_date}
-            onChange={handleFormChange}
-            required
-          />
-          <input
-            className="border px-2 py-1 rounded mb-2 w-full"
-            name="purpose"
-            value={form.purpose}
-            onChange={handleFormChange}
-            placeholder="Purpose"
-            required
-          />
-          <button className="bg-green-700 text-white px-4 py-1 rounded" type="submit">
-            Submit Borrow
-          </button>
-        </form>
+      <Box sx={{ p: 3 }}>
+        {/* Header */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" gutterBottom fontWeight="700">
+            Borrow Management
+          </Typography>
+          <Typography variant="h6" color="text.secondary">
+            Track and manage item borrow requests
+          </Typography>
+        </Box>
+
+        {/* Action Bar */}
+        <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {user?.role === "staff" && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setDialogOpen(true)}
+              sx={{ borderRadius: 2 }}
+            >
+              New Borrow Request
+            </Button>
+          )}
+        </Box>
+
+        {/* Create Borrow Request Dialog */}
+        <Dialog 
+          open={dialogOpen} 
+          onClose={() => setDialogOpen(false)} 
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle>
+            <Typography variant="h6" fontWeight="600">
+              New Borrow Request
+            </Typography>
+          </DialogTitle>
+          <form onSubmit={handleSubmit}>
+            <DialogContent>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Select Item"
+                    name="item_id"
+                    value={form.item_id}
+                    onChange={handleFormChange}
+                    required
+                  >
+                    <MenuItem value="">Choose an item</MenuItem>
+                    {items.map((item) => (
+                      <MenuItem key={item.id} value={item.id}>
+                        <Box>
+                          <Typography variant="body1">{item.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Stock: {item.stock} • {item.category}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Borrow Date"
+                    name="borrow_date"
+                    type="date"
+                    value={form.borrow_date}
+                    onChange={handleFormChange}
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Expected Return Date"
+                    name="expected_return_date"
+                    type="date"
+                    value={form.expected_return_date}
+                    onChange={handleFormChange}
+                    required
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Purpose"
+                    name="purpose"
+                    value={form.purpose}
+                    onChange={handleFormChange}
+                    required
+                    multiline
+                    rows={3}
+                    placeholder="Please describe the purpose of borrowing this item..."
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions sx={{ p: 3 }}>
+              <Button onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="contained">
+                Submit Request
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+
+        {/* Borrow Records List */}
         {loading ? (
-          <div>Loading...</div>
+          <Box sx={{ textAlign: "center", p: 4 }}>
+            <Typography variant="h6">Loading borrow records...</Typography>
+          </Box>
         ) : error ? (
-          <div className="text-red-600">{error}</div>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
         ) : (
-          <ul className="divide-y">
+          <Grid container spacing={3}>
             {borrows.map((br) => (
-              <li key={br.id} className="py-4 border-b">
-                <div className="font-semibold text-lg mb-1">Borrower: {br.borrowedBy?.name || br.borrowed_by?.name || br.borrowed_by}</div>
-                <div className="mb-1">Purpose: {br.purpose}</div>
-                <div className="mb-1">Status: {br.status}</div>
-                <div className="mb-1">Borrow Date: {br.borrow_date ? new Date(br.borrow_date).toLocaleDateString() : ''}</div>
-                <div className="mb-1">Expected Return: {br.expected_return_date ? new Date(br.expected_return_date).toLocaleDateString() : ''}</div>
-                <div className="mb-1">Condition: {br.condition_before || br.condition_after || 'N/A'}</div>
-                <div className="mt-2 font-semibold">Borrow Record Details:</div>
-                <div className="ml-4">Item: {br.item?.name || br.item_id}</div>
-                {br.status === "Pending" && user?.role === "supply_officer" && (
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      className="bg-green-600 text-white px-2 py-1 rounded"
-                      onClick={async () => {
-                        try {
-                          await updateBorrow(br.id, { status: "Approved" });
-                          setNotif("Borrow request approved. Staff will be notified.");
-                          setBorrows((prev) => prev.map(r => r.id === br.id ? { ...r, status: "Approved" } : r));
-                        } catch {
-                          setNotif("Failed to approve borrow request.");
-                        }
-                      }}
-                    >Approve</button>
-                    <button
-                      className="bg-red-600 text-white px-2 py-1 rounded"
-                      onClick={async () => {
-                        try {
-                          await updateBorrow(br.id, { status: "Rejected" });
-                          setNotif("Borrow request rejected. Staff will be notified.");
-                          setBorrows((prev) => prev.map(r => r.id === br.id ? { ...r, status: "Rejected" } : r));
-                        } catch {
-                          setNotif("Failed to reject borrow request.");
-                        }
-                      }}
-                    >Reject</button>
-                  </div>
-                )}
-                <button className="bg-red-600 text-white px-2 py-1 rounded mt-2" onClick={() => handleDelete(br.id)}>
-                  Delete
-                </button>
-              </li>
+              <Grid item xs={12} key={br.id}>
+                <Card 
+                  sx={{ 
+                    borderRadius: 2,
+                    borderLeft: 4,
+                    borderColor: getStatusColor(br.status),
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Avatar sx={{ bgcolor: "primary.main" }}>
+                          <PersonIcon />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h6" fontWeight="600">
+                            {br.borrowedBy?.name || br.borrowed_by?.name || br.borrowed_by}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Borrower
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Chip 
+                        icon={getStatusIcon(br.status)}
+                        label={br.status}
+                        color={getStatusColor(br.status)}
+                        variant="filled"
+                      />
+                    </Box>
+
+                    <Grid container spacing={3} sx={{ mb: 2 }}>
+                      <Grid item xs={12} md={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                          <InventoryIcon color="action" />
+                          <Box>
+                            <Typography variant="subtitle1" fontWeight="600">
+                              {br.item?.name || br.item_id}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Item
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                          <PurposeIcon color="action" />
+                          <Box>
+                            <Typography variant="body2">
+                              {br.purpose}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Purpose
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                          <DateIcon color="action" />
+                          <Box>
+                            <Typography variant="body2" fontWeight="500">
+                              {br.borrow_date ? new Date(br.borrow_date).toLocaleDateString() : 'N/A'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Borrow Date
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                          <DateIcon color="action" />
+                          <Box>
+                            <Typography 
+                              variant="body2" 
+                              fontWeight="500"
+                              color={isOverdue(br.expected_return_date) ? "error" : "text.primary"}
+                            >
+                              {br.expected_return_date ? new Date(br.expected_return_date).toLocaleDateString() : 'N/A'}
+                              {isOverdue(br.expected_return_date) && (
+                                <Chip 
+                                  label="Overdue" 
+                                  color="error" 
+                                  size="small" 
+                                  sx={{ ml: 1 }}
+                                />
+                              )}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Expected Return
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {br.condition_before || br.condition_after ? (
+                      <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                          <ConditionIcon color="action" fontSize="small" />
+                          <Typography variant="subtitle2" fontWeight="600">
+                            Condition Report
+                          </Typography>
+                        </Box>
+                        {br.condition_before && (
+                          <Typography variant="body2">
+                            Before: {br.condition_before}
+                          </Typography>
+                        )}
+                        {br.condition_after && (
+                          <Typography variant="body2">
+                            After: {br.condition_after}
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : null}
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      {br.status === "Pending" && user?.role === "supply_officer" && (
+                        <>
+                          <Button
+                            startIcon={<ApproveIcon />}
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            onClick={() => handleStatusUpdate(br.id, "Approved")}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            startIcon={<RejectIcon />}
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            onClick={() => handleStatusUpdate(br.id, "Rejected", "Rejected by supply officer")}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        startIcon={<DeleteIcon />}
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleDelete(br.id)}
+                        sx={{ ml: "auto" }}
+                      >
+                        Delete Record
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
             ))}
-          </ul>
+          </Grid>
         )}
-      </div>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
     </DashboardLayout>
   );
 };

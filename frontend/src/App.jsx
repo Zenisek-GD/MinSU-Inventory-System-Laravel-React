@@ -55,6 +55,17 @@ const AppRoutes = () => {
             </>
           </ProtectedRoute>
         } />
+        <Route path="/borrow-item" element={
+          <ProtectedRoute>
+            {user && user.role === 'staff' ? (
+              <React.Suspense fallback={<Loading />}>
+                <BorrowsPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={
