@@ -45,7 +45,7 @@ const AppRoutes = () => {
         <Route path="/borrows" element={
           <ProtectedRoute>
             <>
-              {user && user.role === 'admin' ? (
+              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                 <React.Suspense fallback={<Loading />}>
                   <BorrowsPage />
                 </React.Suspense>
@@ -75,7 +75,7 @@ const AppRoutes = () => {
         } />
         <Route path="/purchase-requests" element={
           <ProtectedRoute>
-            {user && user.role === 'admin' ? (
+            {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
               <React.Suspense fallback={<Loading />}>
                 <PurchaseRequestsPage />
               </React.Suspense>
@@ -108,21 +108,63 @@ const AppRoutes = () => {
         } />
         <Route path="/items" element={
           <ProtectedRoute>
-            {user && user.role === 'admin' ? (
-              <React.Suspense fallback={<Loading />}>
-                <ItemsPage />
-              </React.Suspense>
+            <>
+              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
+                <React.Suspense fallback={<Loading />}>
+                  <ItemsPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
+        <Route path="/inventory" element={
+          <ProtectedRoute>
+            <>
+              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
+                <React.Suspense fallback={<Loading />}>
+                  <InventoryPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
+        <Route path="/monitoring" element={
+          <ProtectedRoute>
+            <>
+              {user && user.role === 'supply_officer' ? (
+                <div style={{ padding: 20 }}>Monitoring Page (to be implemented)</div>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
+        <Route path="/transaction-logs" element={
+          <ProtectedRoute>
+            {user && user.role === 'supply_officer' ? (
+              <div style={{ padding: 20 }}>Transaction Logs Page (to be implemented)</div>
             ) : (
               <Navigate to="/dashboard" />
             )}
           </ProtectedRoute>
         } />
-        <Route path="/inventory" element={
+        <Route path="/return-processing" element={
           <ProtectedRoute>
-            {user && user.role === 'admin' ? (
-              <React.Suspense fallback={<Loading />}>
-                <InventoryPage />
-              </React.Suspense>
+            {user && user.role === 'supply_officer' ? (
+              <div style={{ padding: 20 }}>Return Processing Page (to be implemented)</div>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/qr-scanner" element={
+          <ProtectedRoute>
+            {user && user.role === 'supply_officer' ? (
+              <div style={{ padding: 20 }}>QR Scanner Page (to be implemented)</div>
             ) : (
               <Navigate to="/dashboard" />
             )}

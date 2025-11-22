@@ -6,6 +6,7 @@ import {
 } from "../api/purchaseRequest";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import { fetchOffices } from "../api/office";
+import { useUser } from "../context/UserContext";
 
 const defaultItem = {
   item_name: "",
@@ -27,6 +28,8 @@ const PurchaseRequestsPage = () => {
     items: [{ ...defaultItem }],
   });
   const [offices, setOffices] = useState([]);
+  const [notif, setNotif] = useState("");
+  const { user } = useUser();
 
   useEffect(() => {
     loadRequests();
@@ -97,6 +100,9 @@ const PurchaseRequestsPage = () => {
     <DashboardLayout>
       <div className="p-6 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Purchase Requests</h1>
+        {notif && (
+          <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{notif}</div>
+        )}
         <form onSubmit={handleSubmit} className="mb-6 border p-4 rounded bg-white">
           <select
             className="border px-2 py-1 rounded mb-2 w-full"
@@ -241,6 +247,34 @@ const PurchaseRequestsPage = () => {
                     ))}
                   </ul>
                 </div>
+                {req.status === "Pending" && user?.role === "supply_officer" && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      className="bg-green-600 text-white px-2 py-1 rounded"
+                      onClick={async () => {
+                        try {
+                          await updatePurchaseRequest(req.id, { status: "Approved" });
+                          setNotif("Request approved. Staff will be notified.");
+                          setRequests((prev) => prev.map(r => r.id === req.id ? { ...r, status: "Approved" } : r));
+                        } catch {
+                          setNotif("Failed to approve request.");
+                        }
+                      }}
+                    >Approve</button>
+                    <button
+                      className="bg-red-600 text-white px-2 py-1 rounded"
+                      onClick={async () => {
+                        try {
+                          await updatePurchaseRequest(req.id, { status: "Rejected" });
+                          setNotif("Request rejected. Staff will be notified.");
+                          setRequests((prev) => prev.map(r => r.id === req.id ? { ...r, status: "Rejected" } : r));
+                        } catch {
+                          setNotif("Failed to reject request.");
+                        }
+                      }}
+                    >Reject</button>
+                  </div>
+                )}
                 <button className="bg-red-600 text-white px-2 py-1 rounded mt-2" onClick={() => handleDelete(req.id)}>
                   Delete
                 </button>

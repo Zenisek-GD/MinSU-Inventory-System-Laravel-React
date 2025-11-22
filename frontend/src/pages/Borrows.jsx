@@ -3,9 +3,11 @@ import {
   fetchBorrows,
   createBorrow,
   deleteBorrow,
+  updateBorrow,
 } from "../api/borrow";
 import { fetchItems } from "../api/item";
 import DashboardLayout from "../components/Layout/DashboardLayout";
+import { useUser } from "../context/UserContext";
 
 const BorrowsPage = () => {
   const [borrows, setBorrows] = useState([]);
@@ -18,6 +20,8 @@ const BorrowsPage = () => {
     purpose: "",
   });
   const [items, setItems] = useState([]);
+  const [notif, setNotif] = useState("");
+  const { user } = useUser();
 
   useEffect(() => {
     loadBorrows();
@@ -74,6 +78,9 @@ const BorrowsPage = () => {
     <DashboardLayout>
       <div className="p-6 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Borrow Records</h1>
+        {notif && (
+          <div className="mb-4 p-2 bg-green-100 text-green-800 rounded">{notif}</div>
+        )}
         <form onSubmit={handleSubmit} className="mb-6 border p-4 rounded bg-white">
           <select
             className="border px-2 py-1 rounded mb-2 w-full"
@@ -131,6 +138,34 @@ const BorrowsPage = () => {
                 <div className="mb-1">Condition: {br.condition_before || br.condition_after || 'N/A'}</div>
                 <div className="mt-2 font-semibold">Borrow Record Details:</div>
                 <div className="ml-4">Item: {br.item?.name || br.item_id}</div>
+                {br.status === "Pending" && user?.role === "supply_officer" && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      className="bg-green-600 text-white px-2 py-1 rounded"
+                      onClick={async () => {
+                        try {
+                          await updateBorrow(br.id, { status: "Approved" });
+                          setNotif("Borrow request approved. Staff will be notified.");
+                          setBorrows((prev) => prev.map(r => r.id === br.id ? { ...r, status: "Approved" } : r));
+                        } catch {
+                          setNotif("Failed to approve borrow request.");
+                        }
+                      }}
+                    >Approve</button>
+                    <button
+                      className="bg-red-600 text-white px-2 py-1 rounded"
+                      onClick={async () => {
+                        try {
+                          await updateBorrow(br.id, { status: "Rejected" });
+                          setNotif("Borrow request rejected. Staff will be notified.");
+                          setBorrows((prev) => prev.map(r => r.id === br.id ? { ...r, status: "Rejected" } : r));
+                        } catch {
+                          setNotif("Failed to reject borrow request.");
+                        }
+                      }}
+                    >Reject</button>
+                  </div>
+                )}
                 <button className="bg-red-600 text-white px-2 py-1 rounded mt-2" onClick={() => handleDelete(br.id)}>
                   Delete
                 </button>
