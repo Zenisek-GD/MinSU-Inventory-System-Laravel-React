@@ -14,6 +14,8 @@ import Loading from "./components/common/Loading";
 import OfficesPage from "./pages/Offices";
 import PurchaseRequestsPage from "./pages/PurchaseRequests";
 import InventoryPage from "./pages/Inventory";
+import QRScanner from "./pages/QRScanner";
+import ReportsPage from "./pages/Reports";
 
 import { UserProvider, useUser } from "./context/UserContext.jsx";
 
@@ -174,8 +176,17 @@ const AppRoutes = () => {
         } />
         <Route path="/qr-scanner" element={
           <ProtectedRoute>
-            {user && user.role === 'supply_officer' ? (
-              <div style={{ padding: 20 }}>QR Scanner Page (to be implemented)</div>
+            <React.Suspense fallback={<Loading />}>
+              <QRScanner />
+            </React.Suspense>
+          </ProtectedRoute>
+        } />
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            {user && user.role === 'admin' ? (
+              <React.Suspense fallback={<Loading />}>
+                <ReportsPage />
+              </React.Suspense>
             ) : (
               <Navigate to="/dashboard" />
             )}

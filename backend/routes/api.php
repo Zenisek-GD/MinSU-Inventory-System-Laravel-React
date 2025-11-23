@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\OfficeController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\PurchaseRequestController;
+use App\Http\Controllers\ReportsController;
 
 Route::prefix('v1')->group(function () {
     // Public routes
@@ -41,5 +42,10 @@ Route::prefix('v1')->group(function () {
         // Custom approve/reject routes for borrows
         Route::put('borrows/{borrowRecord}/approve', [\App\Http\Controllers\Api\V1\BorrowController::class, 'approve']);
         Route::put('borrows/{borrowRecord}/reject', [\App\Http\Controllers\Api\V1\BorrowController::class, 'reject']);
+
+        // Report routes
+        Route::get('reports/items', [ReportsController::class, 'itemsReport']);
+        Route::get('reports/borrows', [ReportsController::class, 'borrowsReport']);
+        Route::get('reports/purchase-requests', [ReportsController::class, 'purchaseRequestsReport']);
     });
 });
