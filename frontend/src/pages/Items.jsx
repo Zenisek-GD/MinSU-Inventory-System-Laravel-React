@@ -4,6 +4,7 @@ import { fetchCategories } from "../api/category";
 import { fetchOffices } from "../api/office";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import ItemQrCode from "../components/ItemQrCode";
+import QRCodePrintModal from "../components/QRCodePrintModal";
 import {
   Box,
   Card,
@@ -82,6 +83,7 @@ const ItemsPage = () => {
   const [editItem, setEditItem] = useState({});
   const [selectedItem, setSelectedItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [qrPrintOpen, setQrPrintOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
@@ -117,7 +119,10 @@ const ItemsPage = () => {
         serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
       });
       setDialogOpen(false);
-      showSnackbar("Item created successfully", "success");
+      // Automatically open QR code print modal with the new item
+      setSelectedItem(result.item);
+      setQrPrintOpen(true);
+      showSnackbar("Item created successfully! Print QR code for the new item.", "success");
     } catch {
       showSnackbar("Failed to create item", "error");
     }
@@ -292,6 +297,18 @@ const ItemsPage = () => {
                       }
                     />
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(item);
+                          setQrPrintOpen(true);
+                        }}
+                        color="success"
+                        title="Print QR Code"
+                      >
+                        <QrCodeIcon fontSize="small" />
+                      </IconButton>
                       <IconButton
                         size="small"
                         onClick={(e) => {
@@ -657,6 +674,13 @@ const ItemsPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* QR Code Print Modal */}
+      <QRCodePrintModal
+        open={qrPrintOpen}
+        onClose={() => setQrPrintOpen(false)}
+        item={selectedItem}
+      />
     </DashboardLayout>
   );
 };

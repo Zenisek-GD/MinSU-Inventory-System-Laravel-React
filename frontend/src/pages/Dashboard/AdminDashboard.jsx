@@ -303,6 +303,16 @@ const AdminDashboard = () => {
     return colors[priority] || 'grey.500';
   };
 
+  // Shared card styling so major dashboard cards align to the same width/look
+  const unifiedCardSx = {
+    background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
+    border: '1px solid',
+    borderColor: 'grey.200',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+    borderRadius: 3,
+    width: '100%'
+  };
+
   return (
     <DashboardLayout>
       <Box sx={{ maxWidth: '1400px', mx: 'auto', px: { xs: 2, sm: 3 } }}>
@@ -334,13 +344,7 @@ const AdminDashboard = () => {
 <Grid container spacing={4}>
   {/* Quick Actions */}
   <Grid item xs={12} lg={6}>
-    <Card sx={{ 
-      background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
-      border: '1px solid',
-      borderColor: 'grey.200',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-      borderRadius: 3
-    }}>
+    <Card sx={unifiedCardSx}>
       <CardContent sx={{ p: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
           <Typography variant="h5" fontWeight="700" color="#006400">
@@ -355,17 +359,19 @@ const AdminDashboard = () => {
         </Box>
         <Grid container spacing={2}>
           {quickActions.map((action, index) => (
-            <Grid item xs={6} key={index}>
+              <Grid item xs={6} key={index}>
               <Button
                 fullWidth
                 variant="outlined"
                 onClick={() => navigate(action.path)}
                 sx={{
-                  height: '120px',
+                  minHeight: { xs: '140px', sm: '150px' },
+                  height: 'auto',
+                  display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'flex-start',
                   justifyContent: 'flex-start',
-                  p: 2.5,
+                  p: 3,
                   border: '2px solid',
                   borderColor: 'grey.200',
                   borderRadius: 2,
@@ -374,6 +380,11 @@ const AdminDashboard = () => {
                   textAlign: 'left',
                   position: 'relative',
                   transition: 'all 0.3s ease',
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                  '& .MuiTypography-root': {
+                    whiteSpace: 'normal'
+                  },
                   '&:hover': {
                     borderColor: '#006400',
                     background: 'linear-gradient(135deg, #f8fff8 0%, #f0f8f0 100%)',
@@ -396,8 +407,8 @@ const AdminDashboard = () => {
                 <ArrowIcon 
                   sx={{ 
                     position: 'absolute', 
-                    bottom: 16, 
-                    right: 16, 
+                    bottom: 12, 
+                    right: 12, 
                     fontSize: '1rem',
                     color: '#006400',
                     opacity: 0.7
@@ -414,14 +425,7 @@ const AdminDashboard = () => {
           {/* Recent Activities & System Metrics */}
           <Grid item xs={12} lg={6}>
             {/* Recent Activities */}
-            <Card sx={{ 
-              mb: 4,
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
-              border: '1px solid',
-              borderColor: 'grey.200',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-              borderRadius: 3
-            }}>
+            <Card sx={{ ...unifiedCardSx, mb: 4 }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                   <Typography variant="h5" fontWeight="700" color="#006400">
@@ -490,13 +494,7 @@ const AdminDashboard = () => {
             </Card>
 
             {/* System Metrics */}
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
-              border: '1px solid',
-              borderColor: 'grey.200',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-              borderRadius: 3
-            }}>
+            <Card sx={unifiedCardSx}>
               <CardContent sx={{ p: 4 }}>
                 <Typography variant="h5" gutterBottom fontWeight="700" sx={{ color: '#006400', mb: 3 }}>
                   System Performance
