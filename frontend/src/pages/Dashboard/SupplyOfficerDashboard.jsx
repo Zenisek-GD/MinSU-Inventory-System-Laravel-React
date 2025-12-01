@@ -623,10 +623,10 @@ const SupplyOfficerDashboard = () => {
                                   {movements.slice(0, 10).map(m => (
                                     <Box key={m.id} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { border: 'none' } }}>
                                       <Typography variant="body2" fontWeight="500">
-                                        {m.item?.name || 'Item'} {m.change_qty > 0 ? '+' : ''}{m.change_qty}
+                                        {m.item?.name || 'Item'} {m.quantity > 0 ? '+' : ''}{m.quantity}
                                       </Typography>
                                       <Typography variant="caption" color="text.secondary">
-                                        {m.movement_type} • {new Date(m.created_at).toLocaleString()}
+                                        {m.type} • {m.performed_by && typeof m.performed_by === 'object' ? m.performed_by.name : 'System'} • {new Date(m.created_at).toLocaleString()}
                                       </Typography>
                                     </Box>
                                   ))}

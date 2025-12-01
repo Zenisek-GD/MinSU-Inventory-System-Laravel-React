@@ -25,7 +25,7 @@ export default function StockDashboardPage(){
 
   // compute current stock per item by summing movements (client-side)
   const computeStock = (itemId) => {
-    const sum = movements.filter(m => m.item_id === itemId).reduce((acc,m)=> acc + Number(m.change_qty), 0);
+    const sum = movements.filter(m => m.item_id === itemId).reduce((acc,m)=> acc + Number(m.quantity || 0), 0);
     return sum;
   };
 
@@ -60,11 +60,19 @@ export default function StockDashboardPage(){
                 <CardContent>
                   <Typography variant="h6">Recent Movements</Typography>
                   <List>
-                    {movements.slice(0,10).map(m => (
-                      <ListItem key={m.id}>
-                        <ListItemText primary={`${m.item?.name || m.item_id} ${m.change_qty > 0 ? '+' : ''}${m.change_qty}`} secondary={`${m.movement_type} • ${new Date(m.created_at).toLocaleString()}`} />
-                      </ListItem>
-                    ))}
+                    {movements.slice(0,10).map(m => {
+                      const performedByDisplay = m.performedBy?.name || 
+                                                 (typeof m.performed_by === 'string' ? m.performed_by : '') || 
+                                                 'System';
+                      return (
+                        <ListItem key={m.id}>
+                          <ListItemText 
+                            primary={`${m.item?.name || m.item_id} ${m.quantity > 0 ? '+' : ''}${m.quantity}`} 
+                            secondary={`${m.type} • By: ${performedByDisplay} • ${new Date(m.created_at).toLocaleString()}`} 
+                          />
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 </CardContent>
               </Card>

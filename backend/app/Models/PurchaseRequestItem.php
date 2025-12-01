@@ -17,9 +17,11 @@ class PurchaseRequestItem extends Model
      */
     protected $fillable = [
         'purchase_request_id',
+        'item_id',
         'item_name',
         'description',
         'quantity',
+        'quantity_received',
         'unit',
         'estimated_unit_price',
         'estimated_total_price',
@@ -34,6 +36,7 @@ class PurchaseRequestItem extends Model
      */
     protected $casts = [
         'quantity' => 'integer',
+        'quantity_received' => 'decimal:2',
         'estimated_unit_price' => 'decimal:2',
         'estimated_total_price' => 'decimal:2',
         'urgency' => 'string',
@@ -45,6 +48,14 @@ class PurchaseRequestItem extends Model
     public function purchaseRequest(): BelongsTo
     {
         return $this->belongsTo(PurchaseRequest::class);
+    }
+
+    /**
+     * Get the inventory item this PR item is linked to (if received).
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Item::class);
     }
 
     /**

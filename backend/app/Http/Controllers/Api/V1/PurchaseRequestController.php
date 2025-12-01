@@ -8,12 +8,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use App\Services\StockService;
 
 class PurchaseRequestController extends Controller
 {
+    protected $stockService;
+
+    public function __construct(StockService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
     public function index(Request $request)
     {
-        $query = PurchaseRequest::with(['office', 'requestedBy', 'approvedBy', 'items']);
+        $query = PurchaseRequest::with(['office', 'requestedBy', 'approvedBy', 'items.item']);
 
         // Filter by status
         if ($request->has('status')) {
@@ -232,9 +240,76 @@ class PurchaseRequestController extends Controller
         $purchaseRequestRecord->load(['office', 'requestedBy', 'approvedBy', 'items']);
 
         return response()->json([
-            'message' => 'Purchase request approved successfully',
+            'message' => 'Purchase request approved successfully. Items can now be received into inventory.',
             'purchase_request' => $purchaseRequestRecord
         ]);
+    }
+
+    /**
+     * Receive purchased items into inventory
+     * This creates inventory items and stock movements
+     */
+    public function receiveItems(Request $request, PurchaseRequest $purchaseRequestRecord)
+    {
+        if ($purchaseRequestRecord->status !== 'Approved') {
+            return response()->json([
+                'message' => 'Purchase request must be approved first'
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array',
+            'items.*.pr_item_id' => 'required|exists:purchase_request_items,id',
+            'items.*.item_id' => 'required|exists:items,id',
+            'items.*.quantity_received' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $stockMovements = [];
+
+            foreach ($request->items as $receivedItem) {
+                // Create stock movement for received item
+                $movement = $this->stockService->recordMovement([
+                    'item_id' => $receivedItem['item_id'],
+                    'type' => 'purchase',
+                    'quantity' => $receivedItem['quantity_received'],
+                    'reference_number' => 'PR-' . $purchaseRequestRecord->pr_number,
+                    'notes' => 'Received from approved purchase request #' . $purchaseRequestRecord->id,
+                    'performed_by' => $request->user()->id,
+                ]);
+
+                $stockMovements[] = $movement;
+            }
+
+            // Optionally update PR status to "Received"
+            $purchaseRequestRecord->update([
+                'status' => 'Received',
+                'notes' => ($purchaseRequestRecord->notes ?? '') . "\nItems received on " . now()->toDateTimeString()
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Items received successfully and stock movements created',
+                'stock_movements' => $stockMovements,
+                'purchase_request' => $purchaseRequestRecord->fresh(['office', 'requestedBy', 'approvedBy', 'items'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Items receiving failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to receive items',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function reject(Request $request, PurchaseRequest $purchaseRequestRecord)

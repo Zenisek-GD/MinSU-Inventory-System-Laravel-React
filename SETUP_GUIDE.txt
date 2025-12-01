@@ -1,0 +1,857 @@
+================================================================================
+MinSU Inventory System - Setup Guide for Developers
+================================================================================
+
+SYSTEM REQUIREMENTS:
+- PHP 8.1 or higher
+- Composer (latest version)
+- Node.js 16.x or higher
+- npm or yarn package manager
+- MySQL 8.0 or higher
+- Git
+
+================================================================================
+INSTALLATION STEPS
+================================================================================
+
+1. CLONE THE REPOSITORY
+   git clone https://github.com/Zenisek-GD/MinSU-Inventory-System-Laravel-React.git
+   cd MinSU-Inventory-System-Laravel-React
+
+================================================================================
+2. BACKEND SETUP (Laravel)
+================================================================================
+
+2.1. Navigate to backend folder:
+     cd backend
+
+2.2. Install PHP dependencies:
+     composer install
+
+2.3. Create environment file:
+     Copy .env.example to .env
+     cp .env.example .env
+
+2.4. Configure database in .env file:
+     DB_CONNECTION=mysql
+     DB_HOST=127.0.0.1
+     DB_PORT=3306
+     DB_DATABASE=minsu_inventory
+     DB_USERNAME=root
+     DB_PASSWORD=your_password
+
+2.5. Generate application key:
+     php artisan key:generate
+
+2.6. Create database:
+     Create a database named "minsu_inventory" in MySQL
+
+2.7. Run migrations:
+     php artisan migrate
+
+2.8. Seed the database with test data:
+     php artisan db:seed
+
+2.9. Create storage symlink:
+     php artisan storage:link
+
+2.10. Start the Laravel development server:
+      php artisan serve
+      (Backend will run on http://localhost:8000)
+
+================================================================================
+3. FRONTEND SETUP (React + Vite)
+================================================================================
+
+3.1. Open a new terminal and navigate to frontend folder:
+     cd frontend
+
+3.2. Install Node.js dependencies:
+     npm install --legacy-peer-deps
+     
+     Note: Use --legacy-peer-deps flag to resolve dependency conflicts
+
+3.3. Configure API endpoint (if needed):
+     Check src/api/axiosConfig.js
+     Default: http://localhost:8000/api/v1
+
+3.4. Start the development server:
+     npm run dev
+     (Frontend will run on http://localhost:5173)
+
+================================================================================
+4. TEST CREDENTIALS
+================================================================================
+
+After seeding the database, you can login with these test accounts:
+
+Admin Account:
+- Email: admin@example.com
+- Password: password
+
+Supply Officer Account:
+- Email: supply@example.com
+- Password: password
+
+Staff Account:
+- Email: staff@example.com
+- Password: password
+
+================================================================================
+5. TEST DATA INCLUDED
+================================================================================
+
+The seeder creates:
+- 5 test items (QR codes: QR001, QR002, QR003, QR004, QR005)
+  * QR001: Laptop (borrowed)
+  * QR002: Office Chair (damaged)
+  * QR003: Printer
+  * QR004: Office Desk
+  * QR005: Printer Paper
+
+- 3 borrow records with different statuses
+- 5 stock movement records (purchases and adjustments)
+
+================================================================================
+6. KEY FEATURES IMPLEMENTED
+================================================================================
+
+✓ User authentication with role-based access (Admin, Supply Officer, Staff)
+✓ Item management with QR code support
+✓ Stock movements tracking (ledger-based inventory)
+✓ Purchase request workflow with approval system
+✓ Borrow/return system with condition auditing
+✓ QR scanner (manual entry, camera, and image upload)
+✓ Stock dashboard with low stock alerts
+✓ Office and category management
+
+================================================================================
+7. TROUBLESHOOTING
+================================================================================
+
+Issue: "Class not found" errors
+Solution: Run "composer dump-autoload" in backend folder
+
+Issue: Database connection error
+Solution: Check MySQL is running and .env credentials are correct
+
+Issue: CORS errors in browser
+Solution: Verify backend/config/cors.php allows frontend URL
+
+Issue: npm install fails
+Solution: Try "npm install --legacy-peer-deps" or delete node_modules and package-lock.json
+
+Issue: Permission errors on storage folder
+Solution: Run "chmod -R 775 storage bootstrap/cache" (Linux/Mac)
+
+Issue: QR scanner not working
+Solution: Ensure jsqr package is installed: "npm install jsqr --legacy-peer-deps"
+
+================================================================================
+8. DEVELOPMENT WORKFLOW
+================================================================================
+
+Backend Development:
+- Make changes to PHP files
+- Laravel auto-reloads with "php artisan serve"
+- Create migrations: php artisan make:migration migration_name
+- Create controllers: php artisan make:controller ControllerName
+- Run tests: php artisan test
+
+Frontend Development:
+- Make changes to React components
+- Vite auto-reloads browser on save
+- Build for production: npm run build
+- Preview production build: npm run preview
+
+================================================================================
+9. PROJECT STRUCTURE
+================================================================================
+
+backend/
+  app/
+    Http/Controllers/Api/V1/  - API controllers
+    Models/                    - Eloquent models
+    Policies/                  - Authorization policies
+    Services/                  - Business logic services
+  database/
+    migrations/                - Database schema
+    seeders/                   - Test data seeders
+  routes/
+    api.php                    - API routes
+
+frontend/
+  src/
+    pages/                     - Page components
+    components/                - Reusable components
+    api/                       - API service functions
+    context/                   - React context providers
+    hooks/                     - Custom React hooks
+
+================================================================================
+10. DETAILED SYSTEM EXPLANATION
+================================================================================
+
+10.1 AUTHENTICATION & AUTHORIZATION SYSTEM
+------------------------------------------
+
+How Login Works:
+1. User submits email/password to backend API endpoint: POST /api/v1/login
+2. Backend validates credentials using Laravel's Hash::check()
+3. If valid, creates Sanctum token and returns user data + token
+4. Frontend stores token in localStorage and user data in AuthContext
+5. All subsequent API requests include token in Authorization header
+
+Role-Based Access Control (RBAC):
+- Three roles: admin, supply_officer, staff
+- Stored in users.role column (enum field)
+- Backend uses Laravel Policies to check permissions
+- Frontend uses useUser() hook to conditionally show/hide UI elements
+
+Example Policy Check (StockMovementPolicy.php):
+  public function viewAny(User $user) {
+      return in_array($user->role, ['admin', 'supply_officer']);
+  }
+
+Role Permissions:
+- Admin: Full access to everything
+- Supply Officer: Manage items, approve requests, view stock movements
+- Staff: View items, create borrow requests, view own requests
+
+
+10.2 ITEM MANAGEMENT SYSTEM
+----------------------------
+
+Items Table Structure:
+- id: Primary key
+- name: Item name
+- qr_code: Unique QR identifier (indexed for fast lookup)
+- category_id: Foreign key to categories table
+- office_id: Current location/office
+- current_stock: Current quantity available
+- reorder_level: Minimum quantity before alert
+- safety_stock: Buffer quantity for emergencies
+- unit: Measurement unit (pcs, box, ream, etc.)
+- status: borrowed/available/damaged/under_maintenance
+- condition_notes: Description of item condition
+
+Item Status Flow:
+1. New item created → status: 'available'
+2. Item borrowed → status: 'borrowed' (automatically updated)
+3. Item returned with damage → status: 'damaged'
+4. Item sent for repair → status: 'under_maintenance'
+5. Item repaired → status: 'available'
+
+Display Status Logic (calculated dynamically):
+- If item has active borrow (not returned) → "Borrowed by [Name]"
+- Else → Shows database status (Available/Damaged/etc.)
+
+QR Code System:
+- Each item has unique QR code (e.g., QR001, QR002)
+- Three scanning methods:
+  a) Manual Entry: Type QR code directly
+  b) Camera Scan: Use device camera with live detection
+  c) Image Upload: Upload QR image, decoded using jsQR library
+  
+QR Lookup Process:
+1. Frontend sends QR code to: GET /api/v1/items/qr/{qr_code}
+2. Backend queries items table with eager loading:
+   Item::with(['borrowRecords.borrowedBy'])->where('qr_code', $qr)->first()
+3. Returns item + current borrow info + borrower details
+4. Frontend displays item details and action buttons
+
+
+10.3 STOCK MOVEMENTS TRACKING (LEDGER SYSTEM)
+----------------------------------------------
+
+Why Ledger System?
+- Traditional inventory: Just update current_stock number
+- Ledger system: Record EVERY transaction in stock_movements table
+- Benefits: Full audit trail, can trace any discrepancy, reversible
+
+Stock Movements Table Structure:
+- id: Primary key
+- item_id: Which item moved
+- type: purchase/transfer/adjustment/damage/disposal
+- quantity: How many (positive or negative)
+- from_office_id: Source location (nullable)
+- to_office_id: Destination location (nullable)
+- performed_by: User ID who did this
+- notes: Reason/description
+- reference_number: PO number, invoice, etc.
+- created_at: When it happened
+
+Movement Types Explained:
+1. PURCHASE: New items received from vendor
+   - quantity: positive
+   - from_office: null
+   - to_office: receiving office
+   - increases current_stock
+
+2. TRANSFER: Move items between offices
+   - quantity: amount transferred
+   - from_office: source office
+   - to_office: destination office
+   - neutral to current_stock (same organization)
+
+3. ADJUSTMENT: Fix stock discrepancies
+   - quantity: positive (found extra) or negative (found missing)
+   - Used after physical count reveals difference
+
+4. DAMAGE: Record damaged/broken items
+   - quantity: negative (reduces stock)
+   - Changes item status to 'damaged'
+
+5. DISPOSAL: Remove items from inventory
+   - quantity: negative
+   - Used for scrapped/donated/thrown away items
+
+Stock Calculation:
+  Current Stock = SUM(all stock_movements.quantity) for that item
+  
+  Example:
+  - Purchase: +10 laptops
+  - Damage: -2 laptops
+  - Transfer out: -3 laptops
+  - Current stock = 10 - 2 - 3 = 5 laptops
+
+StockService.php handles all stock operations:
+  public function recordMovement($data) {
+      DB::transaction(function() use ($data) {
+          // 1. Create stock_movement record
+          $movement = StockMovement::create($data);
+          
+          // 2. Update item current_stock
+          $item->current_stock += $data['quantity'];
+          $item->save();
+          
+          // 3. Check reorder level, trigger alert if needed
+      });
+  }
+
+
+10.4 BORROW & RETURN SYSTEM
+----------------------------
+
+Borrow Records Table:
+- id: Primary key
+- item_id: What was borrowed
+- borrowed_by: User ID who borrowed
+- borrowed_date: When borrowed
+- expected_return_date: Due date
+- returned_date: Actual return (null if not returned)
+- status: pending/approved/returned/rejected
+- purpose: Why borrowing
+- condition_before: Item condition when borrowed
+- condition_after: Item condition when returned
+- approved_by: Admin/supply officer who approved
+
+Borrow Flow:
+1. Staff submits borrow request: POST /api/v1/borrow-records
+   - Selects item, dates, states purpose
+   - Status: 'pending'
+   - Item status unchanged (still available)
+
+2. Supply Officer reviews request:
+   - Sees pending requests in dashboard
+   - Can approve or reject with notes
+   - If approved: item status → 'borrowed'
+   - Creates condition audit record
+
+3. Staff returns item:
+   - Supply Officer scans QR or finds in catalog
+   - Clicks "Mark as Returned"
+   - Records condition_after (good/minor_damage/major_damage)
+   - Borrow record updated: returned_date set, status → 'returned'
+   - Item status → 'available' (or 'damaged' if damaged)
+
+Condition Auditing:
+- condition_before: Recorded when item borrowed (baseline)
+- condition_after: Recorded when returned (comparison)
+- If condition_after worse → Staff may be held responsible
+- Helps track item degradation over time
+
+
+10.5 PURCHASE REQUEST WORKFLOW
+-------------------------------
+
+Purchase Requests System:
+- Staff can request to buy new items
+- Multi-item requests supported (one request, many items)
+
+Tables Involved:
+1. purchase_requests:
+   - id, requested_by, status, priority, justification, notes
+   
+2. purchase_request_items:
+   - id, purchase_request_id, name, category, quantity, estimated_cost
+
+Request Flow:
+1. Staff Creates Request:
+   - Fills out form with items needed
+   - Provides justification and priority (low/medium/high/urgent)
+   - Status: 'pending'
+
+2. Supply Officer Reviews:
+   - Sees all pending requests
+   - Can check budget, necessity
+   - Options: Approve or Reject
+   
+3. If Rejected:
+   - Must provide rejection notes (validation enforced)
+   - Staff notified with reason
+   - Status: 'rejected'
+   
+4. If Approved:
+   - Status: 'approved'
+   - Supply officer proceeds to purchase
+   - After receiving items, creates stock movement (type: purchase)
+
+Request Status States:
+- pending: Awaiting review
+- approved: Accepted, will be purchased
+- rejected: Denied with reason
+- completed: Items received and added to inventory
+
+
+10.6 CATEGORY & OFFICE MANAGEMENT
+----------------------------------
+
+Categories Table:
+- Groups similar items (Electronics, Furniture, Supplies, etc.)
+- Each item belongs to one category
+- Used for filtering and reporting
+- Admin can create/edit/delete categories
+
+Offices Table:
+- Physical locations within organization
+- Tracks where items are located
+- Used in stock transfers
+- Examples: IT Office, Admin Office, Supply Room
+
+Relationship:
+  Item → belongs to Category
+  Item → currently in Office
+  Stock Movement → from Office → to Office
+
+
+10.7 STOCK DASHBOARD & ALERTS
+------------------------------
+
+Supply Officer Dashboard shows:
+
+1. Low Stock Items:
+   - Query: items where current_stock <= reorder_level
+   - Shows items needing reorder
+   - Visual indicator (red chip)
+   - Helps prevent stockouts
+
+2. Recent Stock Movements:
+   - Last 10 transactions
+   - Shows type, quantity, date, performer
+   - Quick overview of inventory activity
+
+3. Summary Cards:
+   - Total Items Count
+   - Low Stock Count
+   - Pending Requests
+   - Active Borrows
+
+Dashboard Loading Strategy:
+- Each section loads independently
+- If one API fails, others still work
+- Better user experience (no complete failure)
+- Error messages show per section
+
+Stock Calculation Display:
+  const computeStock = (item) => {
+      const purchases = movements.filter(m => m.type === 'purchase')
+                                 .reduce((sum, m) => sum + m.quantity, 0);
+      const damages = movements.filter(m => m.type === 'damage')
+                               .reduce((sum, m) => sum + Math.abs(m.quantity), 0);
+      return purchases - damages;
+  };
+
+
+10.8 FRONTEND ARCHITECTURE
+---------------------------
+
+Technology Stack:
+- React 18: UI library with hooks
+- React Router v6: Client-side routing
+- Material-UI (MUI): Component library
+- Axios: HTTP client for API calls
+- jsQR: QR code decoding library
+- Vite: Build tool and dev server
+
+Key Patterns:
+
+1. Context API (AuthContext):
+   - Stores user authentication state
+   - Provides login/logout functions
+   - Accessible via useUser() hook throughout app
+   
+   Usage:
+   const { user, token, login, logout } = useUser();
+
+2. Custom Hooks:
+   - useUser(): Access auth context
+   - Encapsulates reusable logic
+   - Simplifies component code
+
+3. API Service Layer (src/api/):
+   - Centralized API functions
+   - Example: itemApi.js exports fetchItems(), createItem(), etc.
+   - Uses axios instance with baseURL and interceptors
+   
+   axiosConfig.js:
+   - Sets base URL: http://localhost:8000/api/v1
+   - Adds Authorization header to all requests
+   - Handles token refresh/expiry
+
+4. Protected Routes:
+   - ProtectedRoute component wraps authenticated pages
+   - Checks if user logged in
+   - Redirects to /login if not authenticated
+   - Also checks role permissions
+
+5. Component Structure:
+   pages/          - Full page components (Dashboard, Items, etc.)
+   components/     - Reusable UI pieces (Sidebar, Header, etc.)
+   components/UI/  - Generic UI elements (buttons, chips, dialogs)
+
+
+10.9 BACKEND ARCHITECTURE
+--------------------------
+
+Laravel Structure:
+
+1. Routes (routes/api.php):
+   - Defines all API endpoints
+   - Groups by version: /api/v1/
+   - Uses middleware: ['auth:sanctum'] for protected routes
+   
+   Critical: Custom routes BEFORE apiResource:
+   Route::get('items/qr/{qr_code}', [ItemController::class, 'showByQr']);
+   Route::apiResource('items', ItemController::class);
+   
+   Why? apiResource creates catch-all {item} parameter that would match "qr"
+
+2. Controllers (app/Http/Controllers/Api/V1/):
+   - Handle HTTP requests
+   - Validate input
+   - Call services/models
+   - Return JSON responses
+   
+   Example:
+   public function index() {
+       $items = Item::with(['category', 'office'])->get();
+       return response()->json($items);
+   }
+
+3. Models (app/Models/):
+   - Represent database tables
+   - Define relationships
+   - Eloquent ORM for database queries
+   
+   Relationships:
+   Item belongsTo Category
+   Item belongsTo Office
+   Item hasMany BorrowRecords
+   Item hasMany StockMovements
+   
+   BorrowRecord belongsTo Item
+   BorrowRecord belongsTo User (borrowedBy)
+   BorrowRecord belongsTo User (approvedBy)
+
+4. Policies (app/Policies/):
+   - Authorization logic
+   - Check if user can perform action
+   
+   Example:
+   public function create(User $user) {
+       return in_array($user->role, ['admin', 'supply_officer']);
+   }
+   
+   Used in controller:
+   $this->authorize('create', StockMovement::class);
+
+5. Services (app/Services/):
+   - Business logic layer
+   - Keeps controllers thin
+   - Handles complex operations
+   
+   StockService::recordMovement():
+   - Validates data
+   - Creates stock_movement record
+   - Updates item current_stock
+   - Checks reorder levels
+   - All in database transaction (atomic)
+
+6. Migrations (database/migrations/):
+   - Version control for database schema
+   - Each migration = one schema change
+   - Can rollback changes
+   
+   Example:
+   php artisan make:migration create_items_table
+   
+   Up method: Creates table
+   Down method: Drops table
+
+7. Seeders (database/seeders/):
+   - Populate database with test data
+   - Useful for development/testing
+   - DatabaseSeeder.php runs all seeders
+   
+   Current seeder creates:
+   - 3 users (admin, supply officer, staff)
+   - 2 offices
+   - 2 categories
+   - 5 items with QR codes
+   - 3 borrow records
+   - 5 stock movements
+
+
+10.10 DATABASE DESIGN DECISIONS
+--------------------------------
+
+Key Design Choices:
+
+1. Soft Deletes:
+   - Records not truly deleted
+   - deleted_at timestamp added instead
+   - Can restore if needed
+   - Maintains referential integrity
+
+2. Timestamps:
+   - created_at: When record created
+   - updated_at: When last modified
+   - Automatic by Laravel
+
+3. Foreign Keys with Constraints:
+   - Ensures data integrity
+   - Can't delete office if items still reference it
+   - Cascade options available (delete children too)
+
+4. Indexes:
+   - qr_code indexed for fast lookups
+   - Foreign keys automatically indexed
+   - Improves query performance
+
+5. Enums for Fixed Values:
+   - status: enum('available', 'borrowed', 'damaged', 'under_maintenance')
+   - Ensures only valid values
+   - Better than storing arbitrary strings
+
+6. Nullable Fields:
+   - from_office_id nullable (for purchases from outside)
+   - returned_date nullable (not returned yet)
+   - Represents optional/pending data
+
+
+10.11 SECURITY FEATURES
+------------------------
+
+1. Authentication:
+   - Laravel Sanctum for API tokens
+   - Tokens stored securely in localStorage
+   - Passwords hashed with bcrypt (never stored plain text)
+
+2. Authorization:
+   - Role-based access control
+   - Policy checks before actions
+   - Frontend hides UI, backend enforces (double protection)
+
+3. CORS Configuration:
+   - Cross-Origin Resource Sharing
+   - Allows frontend (localhost:5173) to call backend (localhost:8000)
+   - Configured in backend/config/cors.php
+
+4. Input Validation:
+   - Request validation classes
+   - Prevents SQL injection
+   - Validates data types, required fields, formats
+
+5. Mass Assignment Protection:
+   - $fillable in models specifies which fields can be mass-assigned
+   - Prevents users from injecting unexpected fields
+
+6. CSRF Protection:
+   - API routes use Sanctum tokens (stateless)
+   - Web routes would use CSRF tokens
+
+
+10.12 ERROR HANDLING STRATEGY
+------------------------------
+
+Frontend:
+- Try-catch blocks around API calls
+- User-friendly error messages (not raw errors)
+- Loading states prevent repeated clicks
+- Empty states when no data ("No items found")
+
+Backend:
+- Validation errors return 422 with field details
+- Authorization errors return 403 Forbidden
+- Not found errors return 404
+- Server errors return 500 with log entry
+
+Example Error Flow:
+1. User submits invalid form
+2. Backend validates, finds errors
+3. Returns: { "message": "Validation failed", "errors": { "email": ["Email is required"] } }
+4. Frontend displays error under email field
+5. User corrects and resubmits
+
+
+10.13 DEVELOPMENT WORKFLOW DETAILS
+-----------------------------------
+
+Making Backend Changes:
+
+1. Create Migration:
+   php artisan make:migration add_field_to_items_table
+   
+2. Edit migration file (database/migrations/):
+   public function up() {
+       Schema::table('items', function (Blueprint $table) {
+           $table->string('serial_number')->nullable();
+       });
+   }
+
+3. Run migration:
+   php artisan migrate
+
+4. Update Model:
+   - Add 'serial_number' to $fillable array
+
+5. Update Controller/API:
+   - Add field to validation rules
+   - Include in API responses
+
+6. Test with Postman/Thunder Client
+
+
+Making Frontend Changes:
+
+1. Create/Edit Component:
+   - Components hot-reload automatically (Vite)
+   - Check browser console for errors
+
+2. Add API Call:
+   - Add function to appropriate api/*.js file
+   - Use in component with useEffect or event handler
+
+3. Update UI:
+   - Material-UI components for consistency
+   - Follow existing patterns
+
+4. Test in Browser:
+   - Check network tab for API calls
+   - Verify data flow
+
+
+10.14 PRODUCTION DEPLOYMENT CONSIDERATIONS
+-------------------------------------------
+
+Before Deploying:
+
+Backend:
+- Set APP_ENV=production in .env
+- Set APP_DEBUG=false
+- Generate new APP_KEY for production
+- Configure production database credentials
+- Set up proper file permissions (775 for storage/)
+- Enable caching: php artisan config:cache
+- Optimize: php artisan optimize
+- Set up queue workers for background jobs
+- Configure proper logging (storage/logs/)
+
+Frontend:
+- Build for production: npm run build
+- Uploads dist/ folder to web server
+- Configure web server (nginx/apache) to serve files
+- Set correct API base URL (not localhost)
+- Enable HTTPS
+- Configure CDN if needed
+
+Security:
+- Use strong database passwords
+- Restrict CORS to production domain only
+- Enable rate limiting on API routes
+- Regular security updates (composer update, npm update)
+- Backup database regularly
+- Monitor logs for suspicious activity
+
+
+10.15 TESTING THE SYSTEM
+-------------------------
+
+Manual Testing Steps:
+
+1. Test Login:
+   - Try valid credentials → Should login
+   - Try invalid → Should show error
+   - Try each role → Should see different menus
+
+2. Test Item Management:
+   - Create item → Check database
+   - Edit item → Verify changes saved
+   - Delete item → Confirm removed
+   - Upload QR code image → Should decode
+
+3. Test Borrow Flow:
+   - Staff creates request → Should appear in pending
+   - Supply officer approves → Item status changes
+   - Supply officer marks returned → Record updated
+
+4. Test Stock Movements:
+   - Record purchase → Stock increases
+   - Record damage → Stock decreases
+   - View dashboard → Stock calculated correctly
+
+5. Test Permissions:
+   - Login as staff → Try to approve request (should fail)
+   - Login as supply officer → Should work
+   - Check frontend hides restricted buttons
+
+Automated Testing:
+- Backend: php artisan test (PHPUnit)
+- Frontend: npm run test (if configured)
+- Create test cases for critical features
+
+
+================================================================================
+11. SUPPORT & DOCUMENTATION
+================================================================================
+
+For questions or issues:
+- Check GitHub Issues: https://github.com/Zenisek-GD/MinSU-Inventory-System-Laravel-React/issues
+- Review Laravel docs: https://laravel.com/docs
+- Review React docs: https://react.dev
+- Review Material-UI docs: https://mui.com
+
+================================================================================
+12. QUICK START SUMMARY
+================================================================================
+
+Terminal 1 (Backend):
+  cd backend
+  composer install
+  cp .env.example .env
+  # Configure database in .env
+  php artisan key:generate
+  php artisan migrate
+  php artisan db:seed
+  php artisan serve
+
+Terminal 2 (Frontend):
+  cd frontend
+  npm install --legacy-peer-deps
+  npm run dev
+
+Open browser: http://localhost:5173
+Login with: admin@example.com / password
+
+================================================================================

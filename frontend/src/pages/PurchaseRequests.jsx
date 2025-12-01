@@ -8,6 +8,7 @@ import {
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import { fetchOffices } from "../api/office";
 import { useUser } from "../context/UserContext";
+import ReceiveItemsDialog from "../components/ReceiveItemsDialog";
 import {
   Box,
   Card,
@@ -41,6 +42,7 @@ import {
   Business as OfficeIcon,
   Person as PersonIcon,
   PriorityHigh as UrgencyIcon,
+  LocalShipping as ReceiveIcon,
 } from "@mui/icons-material";
 
 const defaultItem = {
@@ -68,6 +70,8 @@ const PurchaseRequestsPage = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
   const [rejectingRequestId, setRejectingRequestId] = useState(null);
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [selectedPRForReceive, setSelectedPRForReceive] = useState(null);
   const { user } = useUser();
 
   useEffect(() => {
@@ -187,8 +191,19 @@ const PurchaseRequestsPage = () => {
       case "Approved": return "success";
       case "Rejected": return "error";
       case "Pending": return "warning";
+      case "Received": return "info";
       default: return "default";
     }
+  };
+
+  const handleReceiveItems = (request) => {
+    setSelectedPRForReceive(request);
+    setReceiveDialogOpen(true);
+  };
+
+  const handleReceiveSuccess = () => {
+    loadRequests();
+    showSnackbar("Items received successfully and stock movements created", "success");
   };
 
   const getUrgencyColor = (urgency) => {
@@ -522,6 +537,17 @@ const PurchaseRequestsPage = () => {
                           </Button>
                         </>
                       )}
+                      {req.status === "Approved" && user?.role === "supply_officer" && (
+                        <Button
+                          startIcon={<ReceiveIcon />}
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => handleReceiveItems(req)}
+                        >
+                          Receive Items
+                        </Button>
+                      )}
                       <Button
                         startIcon={<DeleteIcon />}
                         variant="outlined"
@@ -581,6 +607,17 @@ const PurchaseRequestsPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Receive Items Dialog */}
+        <ReceiveItemsDialog
+          open={receiveDialogOpen}
+          onClose={() => {
+            setReceiveDialogOpen(false);
+            setSelectedPRForReceive(null);
+          }}
+          purchaseRequest={selectedPRForReceive}
+          onSuccess={handleReceiveSuccess}
+        />
       </Box>
     </DashboardLayout>
   );

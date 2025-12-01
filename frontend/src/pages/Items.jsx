@@ -55,13 +55,15 @@ import {
 } from "@mui/icons-material";
 
 const statusOptions = [
-  { value: "available", label: "Available", color: "success", icon: <AvailableIcon /> },
-  { value: "borrowed", label: "Borrowed", color: "warning", icon: <WarningIcon /> },
-  { value: "damaged", label: "Damaged", color: "error", icon: <ErrorIcon /> },
-  { value: "disposed", label: "Disposed", color: "default", icon: <ErrorIcon /> },
+  { value: "Available", label: "Available", color: "success", icon: <AvailableIcon /> },
+  { value: "Borrowed", label: "Borrowed", color: "warning", icon: <WarningIcon /> },
+  { value: "Under Maintenance", label: "Under Maintenance", color: "warning", icon: <WarningIcon /> },
+  { value: "Lost", label: "Lost", color: "error", icon: <ErrorIcon /> },
+  { value: "Disposed", label: "Disposed", color: "default", icon: <ErrorIcon /> },
 ];
 
 const conditionOptions = ['Excellent', 'Good', 'Fair', 'Needs Repair', 'Damaged', 'Disposed'];
+const returnConditionOptions = ['Excellent', 'Good', 'Fair', 'Needs Repair', 'Damaged']; // Disposed not allowed for returns
 
 const ItemsPage = () => {
   const theme = useTheme();
@@ -76,7 +78,7 @@ const ItemsPage = () => {
     description: "",
     category_id: "",
     office_id: "",
-    status: "available",
+    status: "Available",
     serial_number: "",
     condition: "Good",
     purchase_date: "",
@@ -122,11 +124,18 @@ const ItemsPage = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    
+    // If editing, call update instead
+    if (editing) {
+      await handleUpdate(editing);
+      return;
+    }
+
     try {
       const result = await createItem(newItem);
       setItems(prev => [result.item, ...prev]);
       setNewItem({
-        name: "", description: "", category_id: "", office_id: "", status: "available",
+        name: "", description: "", category_id: "", office_id: "", status: "Available",
         serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
       });
       setDialogOpen(false);
@@ -141,7 +150,7 @@ const ItemsPage = () => {
 
   const handleEdit = (item) => {
     setEditing(item.id);
-    setEditItem({
+    setNewItem({
       name: item.name,
       description: item.description,
       category_id: item.category_id,
@@ -154,17 +163,31 @@ const ItemsPage = () => {
       warranty_expiry: item.warranty_expiry,
       notes: item.notes
     });
+    setDialogOpen(true);
   };
 
   const handleUpdate = async (id) => {
     try {
-      const result = await updateItem(id, editItem);
+      const result = await updateItem(id, newItem);
       setItems(prev => prev.map(item => item.id === id ? result.item : item));
       setEditing(null);
-      setEditItem({});
+      setNewItem({
+        name: "",
+        description: "",
+        category_id: "",
+        office_id: "",
+        status: "Available",
+        serial_number: "",
+        condition: "Good",
+        purchase_date: "",
+        purchase_price: "",
+        warranty_expiry: "",
+        notes: ""
+      });
+      setDialogOpen(false);
       showSnackbar("Item updated successfully", "success");
-    } catch {
-      showSnackbar("Failed to update item", "error");
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || "Failed to update item", "error");
     }
   };
 
@@ -615,10 +638,17 @@ const ItemsPage = () => {
       </Box>
 
       {/* Create Item Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => {
+        setDialogOpen(false);
+        setEditing(null);
+        setNewItem({
+          name: "", description: "", category_id: "", office_id: "", status: "Available",
+          serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
+        });
+      }} maxWidth="md" fullWidth>
         <DialogTitle>
           <Typography variant="h6" fontWeight="600">
-            Add New Item
+            {editing ? 'Edit Item' : 'Add New Item'}
           </Typography>
         </DialogTitle>
         <form onSubmit={handleCreate}>
@@ -752,8 +782,17 @@ const ItemsPage = () => {
             </Grid>
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained">Create Item</Button>
+            <Button onClick={() => {
+              setDialogOpen(false);
+              setEditing(null);
+              setNewItem({
+                name: "", description: "", category_id: "", office_id: "", status: "Available",
+                serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: ""
+              });
+            }}>Cancel</Button>
+            <Button type="submit" variant="contained">
+              {editing ? 'Update Item' : 'Create Item'}
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -786,7 +825,7 @@ const ItemsPage = () => {
             onChange={e => setReturnData({ ...returnData, condition: e.target.value })}
             sx={{ mb: 2 }}
           >
-            {conditionOptions.map(option => (
+            {returnConditionOptions.map(option => (
               <MenuItem key={option} value={option}>
                 {option}
               </MenuItem>

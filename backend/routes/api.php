@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
         // Custom approve/reject routes for purchase requests
         Route::put('purchase-requests/{purchaseRequestRecord}/approve', [PurchaseRequestController::class, 'approve']);
         Route::put('purchase-requests/{purchaseRequestRecord}/reject', [PurchaseRequestController::class, 'reject']);
+        Route::post('purchase-requests/{purchaseRequestRecord}/receive', [PurchaseRequestController::class, 'receiveItems']);
         // Borrow resource routes
         Route::apiResource('borrows', \App\Http\Controllers\Api\V1\BorrowController::class);
         // Custom approve/reject routes for borrows
@@ -46,6 +47,8 @@ Route::prefix('v1')->group(function () {
         // Return processing for borrows (record returned item + stock movement)
         Route::put('borrows/{borrowRecord}/return', [\App\Http\Controllers\Api\V1\BorrowController::class, 'returnItem']);
         // Stock movements
+        Route::get('stock-movements/item/{itemId}/summary', [\App\Http\Controllers\Api\V1\StockMovementController::class, 'itemSummary']);
+        Route::post('stock-movements/item/{itemId}/reconcile', [\App\Http\Controllers\Api\V1\StockMovementController::class, 'reconcile']);
         Route::apiResource('stock-movements', \App\Http\Controllers\Api\V1\StockMovementController::class)->only(['index', 'store']);
 
         // Report routes

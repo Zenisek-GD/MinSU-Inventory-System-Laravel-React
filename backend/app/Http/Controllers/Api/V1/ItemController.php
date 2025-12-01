@@ -6,9 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use Illuminate\Http\Request;
 use Validator;
+use App\Services\StockService;
+use Illuminate\Support\Facades\DB;
 
 class ItemController extends Controller
 {
+    protected $stockService;
+
+    public function __construct(StockService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
     public function index(Request $request)
     {
         $query = Item::with(['office', 'category', 'borrowRecords.borrowedBy']);
@@ -158,13 +167,67 @@ class ItemController extends Controller
             ], 422);
         }
 
-        $item->update($request->all());
-        $item->load(['office', 'category']);
+        DB::beginTransaction();
+        try {
+            // Check if office is changing (automatic transfer)
+            if ($request->has('office_id') && $item->office_id != $request->office_id) {
+                $oldOfficeId = $item->office_id;
+                $newOfficeId = $request->office_id;
 
-        return response()->json([
-            'message' => 'Item updated successfully',
-            'item' => $item
-        ]);
+                // Auto-create transfer stock movement
+                $this->stockService->recordMovement([
+                    'item_id' => $item->id,
+                    'type' => 'transfer',
+                    'quantity' => 1, // Assuming single item transfer
+                    'from_office_id' => $oldOfficeId,
+                    'to_office_id' => $newOfficeId,
+                    'reference_number' => 'AUTO-TRANSFER-' . time(),
+                    'notes' => 'Automatic transfer: Office changed from ' . $item->office->name . ' to office #' . $newOfficeId,
+                    'performed_by' => $request->user()->id,
+                ]);
+            }
+
+            // Check if status is changing to Disposed (automatic disposal)
+            if ($request->has('status') && $request->status === 'Disposed' && $item->status !== 'Disposed') {
+                $this->stockService->recordMovement([
+                    'item_id' => $item->id,
+                    'type' => 'disposal',
+                    'quantity' => -1,
+                    'reference_number' => 'AUTO-DISPOSAL-' . time(),
+                    'notes' => 'Automatic disposal: Item status changed to Disposed. Reason: ' . ($request->notes ?? 'Not specified'),
+                    'performed_by' => $request->user()->id,
+                ]);
+            }
+
+            // Check if condition is changing to Damaged (automatic damage record)
+            if ($request->has('condition') && in_array($request->condition, ['Damaged', 'Needs Repair']) && !in_array($item->condition, ['Damaged', 'Needs Repair'])) {
+                $this->stockService->recordMovement([
+                    'item_id' => $item->id,
+                    'type' => 'damage',
+                    'quantity' => 0, // Not removing from stock, just recording damage
+                    'reference_number' => 'AUTO-DAMAGE-' . time(),
+                    'notes' => 'Automatic damage record: Item condition changed to ' . $request->condition . '. ' . ($request->notes ?? ''),
+                    'performed_by' => $request->user()->id,
+                ]);
+            }
+
+            $item->update($request->all());
+            $item->load(['office', 'category']);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Item updated successfully',
+                'item' => $item
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Item update failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to update item',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function destroy(Item $item)

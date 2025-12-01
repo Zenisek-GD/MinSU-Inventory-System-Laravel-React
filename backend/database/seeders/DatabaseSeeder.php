@@ -200,90 +200,14 @@ class DatabaseSeeder extends Seeder
                 'expected_return_date' => now()->addDays(7),
                 'actual_return_date' => null,
                 'purpose' => 'Department printing needs',
-                'condition_before' => null,
+                'condition_before' => 'Good',
                 'condition_after' => null,
                 'status' => 'Pending',
                 'notes' => null,
             ]);
         }
 
-        // Create sample stock movements to demonstrate the feature
-        // Incoming movements (stock additions)
-        if ($laptop) {
-            StockMovement::create([
-                'item_id' => $laptop->id,
-                'change_qty' => 5,
-                'movement_type' => 'incoming',
-                'reason' => 'purchase',
-                'reference_type' => 'purchase_order',
-                'reference_id' => 1,
-                'performed_by' => $supplyOfficer->id,
-                'from_office_id' => null,
-                'to_office_id' => $office1->id,
-                'notes' => 'Initial stock received',
-            ]);
-        }
-
-        if ($chair) {
-            StockMovement::create([
-                'item_id' => $chair->id,
-                'change_qty' => 10,
-                'movement_type' => 'incoming',
-                'reason' => 'purchase',
-                'reference_type' => 'purchase_order',
-                'reference_id' => 2,
-                'performed_by' => $supplyOfficer->id,
-                'from_office_id' => null,
-                'to_office_id' => $office1->id,
-                'notes' => 'Bulk purchase for office setup',
-            ]);
-        }
-
-        if ($printer) {
-            StockMovement::create([
-                'item_id' => $printer->id,
-                'change_qty' => 3,
-                'movement_type' => 'incoming',
-                'reason' => 'purchase',
-                'reference_type' => 'purchase_order',
-                'reference_id' => 3,
-                'performed_by' => $supplyOfficer->id,
-                'from_office_id' => null,
-                'to_office_id' => $office1->id,
-                'notes' => 'Annual purchase',
-            ]);
-        }
-
-        // Outgoing movements (simulating borrows)
-        if ($laptop) {
-            StockMovement::create([
-                'item_id' => $laptop->id,
-                'change_qty' => -1,
-                'movement_type' => 'outgoing',
-                'reason' => 'borrow',
-                'reference_type' => 'borrow',
-                'reference_id' => 1,
-                'performed_by' => $supplyOfficer->id,
-                'from_office_id' => $office1->id,
-                'to_office_id' => $staffUser->id,
-                'notes' => 'Borrowed by staff',
-            ]);
-        }
-
-        // Adjustment movements (inventory corrections)
-        if ($chair) {
-            StockMovement::create([
-                'item_id' => $chair->id,
-                'change_qty' => -2,
-                'movement_type' => 'adjustment',
-                'reason' => 'damaged',
-                'reference_type' => 'damage_report',
-                'reference_id' => 1,
-                'performed_by' => $supplyOfficer->id,
-                'from_office_id' => $office1->id,
-                'to_office_id' => null,
-                'notes' => 'Chairs damaged beyond repair',
-            ]);
-        }
+        // Call the comprehensive stock movements seeder
+        $this->call(StockMovementSeeder::class);
     }
 }
