@@ -25,6 +25,11 @@ class PurchaseRequestController extends Controller
             $query->where('office_id', $request->office_id);
         }
 
+        // Filter by requested_by (user who submitted the request)
+        if ($request->has('requested_by')) {
+            $query->where('requested_by', $request->requested_by);
+        }
+
         $purchaseRequests = $query->latest()->get();
 
         return response()->json($purchaseRequests);

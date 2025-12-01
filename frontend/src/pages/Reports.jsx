@@ -74,12 +74,26 @@ const ReportsPage = () => {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Admin Reports</h1>
-        <p className="text-gray-600 mb-6">Generate and export inventory reports with filters</p>
+        <div className="mb-4">
+          <nav className="text-sm text-gray-500 mb-2" aria-label="Breadcrumb">
+            <ol className="list-none p-0 inline-flex">
+              <li className="flex items-center">
+                <span className="text-gray-400">Dashboard</span>
+                <svg className="w-3 h-3 mx-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </li>
+              <li className="flex items-center text-gray-700 font-semibold">Reports</li>
+            </ol>
+          </nav>
+          <h1 className="text-3xl font-bold mb-2">Admin Reports</h1>
+          <p className="text-gray-600 mb-6">Generate and export inventory reports with filters</p>
+        </div>
 
         {/* Filter Card */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Report Filters</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
+            Report Filters
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -135,56 +149,90 @@ const ReportsPage = () => {
               </select>
             </div>
           </div>
-          <div className="mt-4 flex gap-2 flex-wrap">
+          <div className="mt-4 flex gap-2 flex-wrap items-center">
             <button 
               onClick={runReport} 
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
-              📊 Run Report
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17a4 4 0 100-8 4 4 0 000 8zM21 21l-4.35-4.35"/></svg>
+              Run Report
             </button>
             <button 
               onClick={exportCsv} 
               disabled={!data || data.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
-              📥 Export CSV
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14"/></svg>
+              Export CSV
             </button>
             <button 
               onClick={handlePrint}
               disabled={!data || data.length === 0}
-              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
-              🖨️ Print / PDF
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7M6 22h12v-7H6v7z"/></svg>
+              Print / PDF
             </button>
+            <div className="ml-auto text-sm text-gray-500">{data?.length ? `${data.length} results` : 'No results'}</div>
           </div>
         </div>
 
         {/* Summary Stats */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="text-gray-600 text-sm font-medium">Total Items</div>
-              <div className="text-2xl font-bold text-blue-600">{stats.total_items}</div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
+              </div>
+              <div>
+                <div className="text-gray-600 text-sm font-medium">Total Items</div>
+                <div className="text-2xl font-bold text-blue-600">{stats.total_items}</div>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="text-gray-600 text-sm font-medium">Available</div>
-              <div className="text-2xl font-bold text-green-600">{stats.available}</div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-green-50 flex items-center justify-center text-green-600">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3"/></svg>
+              </div>
+              <div>
+                <div className="text-gray-600 text-sm font-medium">Available</div>
+                <div className="text-2xl font-bold text-green-600">{stats.available}</div>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="text-gray-600 text-sm font-medium">Borrowed</div>
-              <div className="text-2xl font-bold text-orange-600">{stats.borrowed}</div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-orange-50 flex items-center justify-center text-orange-600">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18"/></svg>
+              </div>
+              <div>
+                <div className="text-gray-600 text-sm font-medium">Borrowed</div>
+                <div className="text-2xl font-bold text-orange-600">{stats.borrowed}</div>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="text-gray-600 text-sm font-medium">Inactive</div>
-              <div className="text-2xl font-bold text-red-600">{stats.inactive}</div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-red-50 flex items-center justify-center text-red-600">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.36 6.64l-12.72 12.72"/></svg>
+              </div>
+              <div>
+                <div className="text-gray-600 text-sm font-medium">Inactive</div>
+                <div className="text-2xl font-bold text-red-600">{stats.inactive}</div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Report Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
             <h2 className="text-lg font-semibold text-gray-800">Items Data</h2>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={exportCsv} disabled={!data || data.length === 0} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-3 py-1.5 rounded-md text-sm">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14"/></svg>
+                Export
+              </button>
+              <button onClick={handlePrint} disabled={!data || data.length === 0} className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 text-white px-3 py-1.5 rounded-md text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7M6 22h12v-7H6v7z"/></svg>
+                Print
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             {loading ? (
@@ -197,22 +245,22 @@ const ReportsPage = () => {
                 <p>No data found. Run a report to see results.</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full min-w-full text-sm table-auto">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">#</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Name</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Category</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Office</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Serial #</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Purchase Date</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700">Price</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">#</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Name</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Category</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Office</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Serial #</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Status</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Purchase Date</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Price</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((row, idx) => (
-                    <tr key={row.id || idx} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                    <tr key={row.id || idx} className={`border-b transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}>
                       <td className="px-6 py-3 text-gray-900">{idx+1}</td>
                       <td className="px-6 py-3 text-gray-900 font-medium">{row.name}</td>
                       <td className="px-6 py-3 text-gray-700">{row.category?.name || '-'}</td>

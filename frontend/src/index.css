@@ -48,3 +48,19 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
+/* Page background and root sizing for consistent layout */
+#root, #app {
+  min-height: 100vh;
+  height: 100%;
+}
+
+body {
+  background-color: #f4f6f8; /* subtle neutral background to match MUI */
+  color: #1f2937;
+}
+
+/* Utility to ensure MUI containers stretch properly */
+.mui-content {
+  min-height: calc(100vh - 64px);
+}

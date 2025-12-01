@@ -1,7 +1,8 @@
 import api from "../api/axios";
 
-export const fetchPurchaseRequests = async () => {
-  const response = await api.get("/purchase-requests");
+// Allow passing query params (e.g. { requested_by: userId, office_id: id, status: 'Pending' })
+export const fetchPurchaseRequests = async (params = {}) => {
+  const response = await api.get("/purchase-requests", { params });
   return response.data;
 };
 

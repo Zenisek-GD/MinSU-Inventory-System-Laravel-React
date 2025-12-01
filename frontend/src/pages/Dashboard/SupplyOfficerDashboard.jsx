@@ -12,6 +12,7 @@ import {
   Chip,
   List,
   ListItem,
+  ListItemText,
   TextField,
   MenuItem,
   alpha,
@@ -33,6 +34,7 @@ import { fetchDashboardStats } from '../../api/dashboard';
 import { fetchPurchaseRequests } from '../../api/purchaseRequest';
 import { fetchBorrows } from '../../api/borrow';
 import { fetchItems } from '../../api/item';
+import { fetchStockMovements } from '../../api/stockMovement';
 import { DashboardCharts } from '../../components/Dashboard/DashboardCharts';
 
 const SupplyOfficerDashboard = () => {
@@ -52,21 +54,56 @@ const SupplyOfficerDashboard = () => {
   const [purchaseRequests, setPurchaseRequests] = useState([]);
   const [borrows, setBorrows] = useState([]);
   const [items, setItems] = useState([]);
+  const [movements, setMovements] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const dashboardStats = await fetchDashboardStats();
-        setStats(dashboardStats);
-        const pr = await fetchPurchaseRequests();
-        setPurchaseRequests(pr);
-        const br = await fetchBorrows();
-        setBorrows(br);
-        const it = await fetchItems();
-        setItems(Array.isArray(it) ? it : (it?.data || []));
+        // Load each data source independently to avoid one failure blocking all
+        try {
+          const dashboardStats = await fetchDashboardStats();
+          setStats(dashboardStats);
+        } catch (err) {
+          console.error('[SupplyOfficerDashboard] Failed to fetch dashboard stats:', err);
+          setStats({ users: [], offices: [], items: [], purchaseRequests: [] });
+        }
+
+        try {
+          const pr = await fetchPurchaseRequests();
+          setPurchaseRequests(pr || []);
+        } catch (err) {
+          console.error('[SupplyOfficerDashboard] Failed to fetch purchase requests:', err);
+          setPurchaseRequests([]);
+        }
+
+        try {
+          const br = await fetchBorrows();
+          setBorrows(br || []);
+        } catch (err) {
+          console.error('[SupplyOfficerDashboard] Failed to fetch borrows:', err);
+          setBorrows([]);
+        }
+
+        try {
+          const it = await fetchItems();
+          setItems(Array.isArray(it) ? it : (it?.data || []));
+        } catch (err) {
+          console.error('[SupplyOfficerDashboard] Failed to fetch items:', err);
+          setItems([]);
+        }
+
+        try {
+          const sm = await fetchStockMovements();
+          setMovements(sm || []);
+        } catch (err) {
+          console.error('[SupplyOfficerDashboard] Failed to fetch stock movements:', err);
+          setMovements([]);
+        }
       } catch (err) {
-        setError('Failed to load dashboard data');
+        console.error('[SupplyOfficerDashboard] Unexpected error:', err);
+        setError('Failed to load dashboard data. Please try refreshing the page.');
       } finally {
         setLoading(false);
       }
@@ -78,6 +115,18 @@ const SupplyOfficerDashboard = () => {
     }
     return () => interval && clearInterval(interval);
   }, [autoRefresh, refreshInterval]);
+
+  // Compute current stock per item by summing movements
+  const computeStock = (itemId) => {
+    const sum = movements.filter(m => m.item_id === itemId).reduce((acc, m) => acc + Number(m.change_qty), 0);
+    return sum;
+  };
+
+  // Get low stock items
+  const lowStockItems = items.filter(i => {
+    const qty = computeStock(i.id);
+    return (i.reorder_level || 0) > 0 && qty <= (i.reorder_level || 0);
+  });
 
   // Advanced filters for requests
   const filteredPurchaseRequests = purchaseRequests.filter(pr =>
@@ -149,8 +198,10 @@ const SupplyOfficerDashboard = () => {
       pending: { color: 'warning', label: 'Pending' },
       approved: { color: 'success', label: 'Approved' },
       rejected: { color: 'error', label: 'Rejected' },
+      returned: { color: 'info', label: 'Returned' },
     };
-    return <Chip label={config[status].label} color={config[status].color} size="small" />;
+    const statusConfig = config[status] || { color: 'default', label: status?.charAt(0).toUpperCase() + status?.slice(1) };
+    return <Chip label={statusConfig.label} color={statusConfig.color} size="small" />;
   };
 
   return (
@@ -520,6 +571,72 @@ const SupplyOfficerDashboard = () => {
                         </Box>
                       </Box>
                     </Paper>
+
+                    {/* Stock Dashboard Section */}
+                    <Box sx={{ mt: 4 }}>
+                      <Typography variant="h5" fontWeight="700" sx={{ mb: 3 }}>
+                        Stock Dashboard
+                      </Typography>
+                      <Grid container spacing={3}>
+                        {/* Low Stock Items */}
+                        <Grid item xs={12} md={6}>
+                          <Card>
+                            <CardContent>
+                              <Typography variant="h6" gutterBottom>
+                                Low Stock Items
+                              </Typography>
+                              {lowStockItems.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  No low stock items
+                                </Typography>
+                              ) : (
+                                <Box>
+                                  {lowStockItems.map(i => (
+                                    <Box key={i.id} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { border: 'none' } }}>
+                                      <Typography variant="body2" fontWeight="500">
+                                        {i.name}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Current: {computeStock(i.id)} • Reorder level: {i.reorder_level || 0}
+                                      </Typography>
+                                    </Box>
+                                  ))}
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+
+                        {/* Recent Stock Movements */}
+                        <Grid item xs={12} md={6}>
+                          <Card>
+                            <CardContent>
+                              <Typography variant="h6" gutterBottom>
+                                Recent Stock Movements
+                              </Typography>
+                              {movements.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  No stock movements
+                                </Typography>
+                              ) : (
+                                <Box>
+                                  {movements.slice(0, 10).map(m => (
+                                    <Box key={m.id} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { border: 'none' } }}>
+                                      <Typography variant="body2" fontWeight="500">
+                                        {m.item?.name || 'Item'} {m.change_qty > 0 ? '+' : ''}{m.change_qty}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {m.movement_type} • {new Date(m.created_at).toLocaleString()}
+                                      </Typography>
+                                    </Box>
+                                  ))}
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      </Grid>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>

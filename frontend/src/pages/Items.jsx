@@ -2,9 +2,11 @@ import React, { useEffect, useState } from "react";
 import { fetchItems, createItem, updateItem, deleteItem } from "../api/item";
 import { fetchCategories } from "../api/category";
 import { fetchOffices } from "../api/office";
+import { returnBorrow } from "../api/borrow";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import ItemQrCode from "../components/ItemQrCode";
 import QRCodePrintModal from "../components/QRCodePrintModal";
+import { useUser } from "../context/UserContext";
 import {
   Box,
   Card,
@@ -48,6 +50,8 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
+  Person as PersonIcon,
+  Logout as ReturnIcon,
 } from "@mui/icons-material";
 
 const statusOptions = [
@@ -61,6 +65,7 @@ const conditionOptions = ['Excellent', 'Good', 'Fair', 'Needs Repair', 'Damaged'
 
 const ItemsPage = () => {
   const theme = useTheme();
+  const { user } = useUser();
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [offices, setOffices] = useState([]);
@@ -84,6 +89,12 @@ const ItemsPage = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [qrPrintOpen, setQrPrintOpen] = useState(false);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnData, setReturnData] = useState({
+    condition: 'Good',
+    notes: ''
+  });
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
@@ -179,6 +190,40 @@ const ItemsPage = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  const handleMarkAsReturned = async () => {
+    if (!selectedItem?.currentBorrow) return;
+
+    setReturnLoading(true);
+    try {
+      const result = await returnBorrow(selectedItem.currentBorrow.id, {
+        condition_after: returnData.condition,
+        notes: returnData.notes
+      });
+
+      // Reload items to reflect the change
+      await loadAll();
+      
+      // Update selected item
+      const updatedItems = await fetchItems();
+      const updated = updatedItems.data.find(item => item.id === selectedItem.id);
+      setSelectedItem(updated);
+
+      setReturnDialogOpen(false);
+      setReturnData({ condition: 'Good', notes: '' });
+      showSnackbar("Item marked as returned successfully", "success");
+    } catch (err) {
+      console.error('Error marking item as returned:', err);
+      showSnackbar("Failed to mark item as returned", "error");
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
+  const handleCloseReturnDialog = () => {
+    setReturnDialogOpen(false);
+    setReturnData({ condition: 'Good', notes: '' });
+  };
+
   const getStatusConfig = (status) => {
     return statusOptions.find(opt => opt.value === status) || statusOptions[0];
   };
@@ -260,42 +305,45 @@ const ItemsPage = () => {
                     onClick={() => setSelectedItem(item)}
                   >
                     <ListItemIcon>
-                      <Avatar sx={{ bgcolor: getStatusConfig(item.status).color }}>
+                      <Avatar sx={{ bgcolor: getStatusConfig(item.display_status || item.status).color }}>
                         <InventoryIcon />
                       </Avatar>
                     </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <Typography variant="subtitle1" fontWeight="600" noWrap sx={{ maxWidth: '200px' }}>
-                            {item.name}
-                          </Typography>
+                    <Box sx={{ width: '100%', py: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="600" noWrap sx={{ maxWidth: '200px' }}>
+                          {item.name}
+                        </Typography>
+                        <Chip
+                          label={getStatusConfig(item.display_status || item.status).label}
+                          color={getStatusConfig(item.display_status || item.status).color}
+                          size="small"
+                        />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: '250px', mb: 1 }}>
+                        {item.description}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Chip
+                          label={item.condition}
+                          color={getConditionColor(item.condition)}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                          {item.category?.name || categories.find(c => c.id === item.category_id)?.name}
+                        </Typography>
+                        {item.currentBorrow && (
                           <Chip
-                            label={getStatusConfig(item.status).label}
-                            color={getStatusConfig(item.status).color}
+                            icon={<PersonIcon />}
+                            label={`Borrowed by ${item.currentBorrow.borrowedBy?.name || 'Unknown'}`}
                             size="small"
+                            color="warning"
+                            variant="outlined"
                           />
-                        </Box>
-                      }
-                      secondary={
-                        <Box sx={{ mt: 0.5 }}>
-                          <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: '250px' }}>
-                            {item.description}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                            <Chip
-                              label={item.condition}
-                              color={getConditionColor(item.condition)}
-                              size="small"
-                              variant="outlined"
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              {item.category?.name || categories.find(c => c.id === item.category_id)?.name}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      }
-                    />
+                        )}
+                      </Box>
+                    </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <IconButton
                         size="small"
@@ -354,9 +402,9 @@ const ItemsPage = () => {
                       </Typography>
                     </Box>
                     <Chip
-                      icon={getStatusConfig(selectedItem.status).icon}
-                      label={getStatusConfig(selectedItem.status).label}
-                      color={getStatusConfig(selectedItem.status).color}
+                      icon={getStatusConfig(selectedItem.display_status || selectedItem.status).icon}
+                      label={getStatusConfig(selectedItem.display_status || selectedItem.status).label}
+                      color={getStatusConfig(selectedItem.display_status || selectedItem.status).color}
                       size="medium"
                     />
                   </Box>
@@ -480,6 +528,52 @@ const ItemsPage = () => {
                         <Typography variant="body1">
                           {selectedItem.notes}
                         </Typography>
+                      </Paper>
+                    </>
+                  )}
+
+                  {/* Borrow Information Section */}
+                  {selectedItem.currentBorrow && (
+                    <>
+                      <Divider sx={{ my: 3 }} />
+                      <Typography variant="h6" fontWeight="600" gutterBottom sx={{ mb: 2 }}>
+                        Current Borrow Record
+                      </Typography>
+                      <Paper sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <PersonIcon color="warning" />
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Borrowed by
+                            </Typography>
+                            <Typography variant="body1" fontWeight="500">
+                              {selectedItem.currentBorrow.borrowedBy?.name || 'Unknown'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                          <DateIcon color="warning" />
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Expected Return Date
+                            </Typography>
+                            <Typography variant="body1" fontWeight="500">
+                              {formatDate(selectedItem.currentBorrow.expected_return_date)}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        {(user?.role === 'supply_officer' || user?.role === 'admin') && (
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            color="success"
+                            startIcon={<ReturnIcon />}
+                            onClick={() => setReturnDialogOpen(true)}
+                            sx={{ mt: 2 }}
+                          >
+                            Mark as Returned
+                          </Button>
+                        )}
                       </Paper>
                     </>
                   )}
@@ -674,6 +768,52 @@ const ItemsPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Return Item Dialog */}
+      <Dialog open={returnDialogOpen} onClose={handleCloseReturnDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Mark Item as Returned
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This will mark the item as returned and set its status back to Available.
+          </Alert>
+          <TextField
+            fullWidth
+            select
+            label="Item Condition"
+            value={returnData.condition}
+            onChange={e => setReturnData({ ...returnData, condition: e.target.value })}
+            sx={{ mb: 2 }}
+          >
+            {conditionOptions.map(option => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            fullWidth
+            label="Return Notes"
+            multiline
+            rows={3}
+            value={returnData.notes}
+            onChange={e => setReturnData({ ...returnData, notes: e.target.value })}
+            placeholder="Any notes about the returned item..."
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={handleCloseReturnDialog}>Cancel</Button>
+          <Button 
+            onClick={handleMarkAsReturned} 
+            variant="contained" 
+            color="success"
+            disabled={returnLoading}
+          >
+            {returnLoading ? 'Processing...' : 'Mark as Returned'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* QR Code Print Modal */}
       <QRCodePrintModal

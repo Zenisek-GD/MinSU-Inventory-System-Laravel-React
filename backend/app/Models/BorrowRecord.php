@@ -64,7 +64,7 @@ class BorrowRecord extends Model
     public function scopeOverdue($query)
     {
         return $query->where('status', 'Borrowed')
-                    ->where('expected_return_date', '<', now());
+            ->where('expected_return_date', '<', now());
     }
 
     public function scopeByBorrower($query, $userId)
@@ -119,8 +119,8 @@ class BorrowRecord extends Model
 
     public function getIsOverdueAttribute()
     {
-        return $this->status === 'Borrowed' && 
-               $this->expected_return_date < now();
+        return $this->status === 'Borrowed' &&
+            $this->expected_return_date < now();
     }
 
     public function getDaysOverdueAttribute()

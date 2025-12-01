@@ -15,7 +15,7 @@ const Loading = ({ message = "Loading..." }) => {
       }}
     >
       <CircularProgress size={60} />
-      <Typography variant="h6" color="textSecondary">
+      <Typography variant="h6" color="text.secondary">
         {message}
       </Typography>
     </Box>

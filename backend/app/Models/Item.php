@@ -20,6 +20,9 @@ class Item extends Model
         'office_id',
         'purchase_date',
         'purchase_price',
+        'reorder_level',
+        'safety_stock',
+        'unit',
         'warranty_expiry',
         'notes'
     ];
@@ -80,7 +83,7 @@ class Item extends Model
     public function scopeNeedsMaintenance($query)
     {
         return $query->whereIn('condition', ['Needs Repair', 'Damaged'])
-                    ->orWhere('status', 'Under Maintenance');
+            ->orWhere('status', 'Under Maintenance');
     }
 
     // Methods

@@ -63,6 +63,7 @@ const Navbar = ({ onMenuToggle }) => {
       '/my-requests': 'My Requests',
       '/request-item': 'Request Item',
       '/borrow-item': 'Borrow Item',
+      '/current-borrows': 'My Borrows',
       '/available-items': 'Available Items',
       '/reports': 'Reports',
       '/qr-scanner': 'QR Scanner',

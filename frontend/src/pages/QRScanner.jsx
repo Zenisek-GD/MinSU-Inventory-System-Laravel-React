@@ -18,10 +18,13 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { QrReader } from '@blackbox-vision/react-qr-reader';
+import jsQR from 'jsqr';
 import DashboardLayout from '../components/Layout/DashboardLayout';
 import { fetchItemByQr, updateItemStatus } from '../api/item';
+import { useUser } from '../context/UserContext';
 
 const QRScanner = () => {
+  const { user } = useUser();
   const [scannedData, setScannedData] = useState('');
   const [scannedItem, setScannedItem] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -33,19 +36,23 @@ const QRScanner = () => {
   const handleScan = async (qrCode) => {
     if (!qrCode || typeof qrCode !== 'string') return;
     
-    setScannedData(qrCode);
+    const cleanedCode = qrCode.trim();
+    setScannedData(cleanedCode);
     setLoading(true);
     setError('');
     setInfo('');
 
     try {
+      console.log('[QRScanner] Scanning QR code:', cleanedCode);
       // Get data from backend API
-      const response = await fetchItemByQr(qrCode);
+      const response = await fetchItemByQr(cleanedCode);
+      console.log('[QRScanner] Item found:', response);
       setScannedItem(response);
       setInfo('Item found successfully!');
     } catch (error) {
-      console.error('Error fetching item:', error);
-      setError('Item not found. Please try a different QR code.');
+      console.error('[QRScanner] Error fetching item:', error);
+      console.error('[QRScanner] Error response:', error.response?.data);
+      setError(`Item not found. Please try a different QR code. (${cleanedCode})`);
       setScannedItem(null);
     } finally {
       setLoading(false);
@@ -63,13 +70,36 @@ const QRScanner = () => {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Simulate QR code reading from image
       const reader = new FileReader();
-      reader.onload = (e) => {
-        // In a real app, you would use a QR code library here
-        // For demo, we'll just use a mock QR code from the filename
-        const mockQrCode = `ITEM-${file.name.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6)}`;
-        handleScan(mockQrCode);
+      reader.onload = async (e) => {
+        // Create an image element to load the file
+        const img = new Image();
+        img.onload = () => {
+          // Create a canvas and draw the image
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          
+          // Get image data
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Decode QR code using jsQR
+          try {
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) {
+              console.log('[QRScanner] QR decoded from image:', code.data);
+              handleScan(code.data);
+            } else {
+              setError('No QR code found in the uploaded image.');
+            }
+          } catch (err) {
+            console.error('[QRScanner] QR decoder error:', err);
+            setError('Error decoding QR code. Please try another image.');
+          }
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -77,12 +107,22 @@ const QRScanner = () => {
 
   const handleUpdateStatus = async (newStatus) => {
     if (!scannedItem) return;
+    setLoading(true);
     try {
+      console.log(`[QRScanner] Updating item ${scannedItem.id} status to ${newStatus}`);
       await updateItemStatus(scannedItem.id, { status: newStatus });
-      setInfo(`Item status updated to ${newStatus}`);
-      setScannedItem({ ...scannedItem, status: newStatus });
-    } catch {
-      setError('Failed to update item status.');
+      console.log(`[QRScanner] Status updated successfully`);
+      // Update the scanned item with new status
+      const updatedItem = { ...scannedItem, status: newStatus };
+      setScannedItem(updatedItem);
+      setInfo(`Item marked as ${newStatus} successfully!`);
+      // Clear error if any
+      setError('');
+    } catch (err) {
+      console.error('[QRScanner] Error updating status:', err);
+      setError(`Failed to update item status to ${newStatus}. Please try again.`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -377,31 +417,7 @@ const QRScanner = () => {
                     </Grid>
                   )}
 
-                  {/* Update Status Buttons */}
-                  <Grid item xs={12}>
-                    <Box display="flex" gap={1} sx={{ mt: 2 }}>
-                      {scannedItem.status === 'Available' && (
-                        <Button
-                          variant="contained"
-                          color="warning"
-                          onClick={() => handleUpdateStatus('Borrowed')}
-                          fullWidth
-                        >
-                          Mark as Borrowed
-                        </Button>
-                      )}
-                      {scannedItem.status === 'Borrowed' && (
-                        <Button
-                          variant="contained"
-                          color="success"
-                          onClick={() => handleUpdateStatus('Available')}
-                          fullWidth
-                        >
-                          Mark as Returned
-                        </Button>
-                      )}
-                    </Box>
-                  </Grid>
+
                 </Grid>
               </CardContent>
             </Card>

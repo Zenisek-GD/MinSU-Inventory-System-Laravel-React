@@ -65,6 +65,9 @@ const PurchaseRequestsPage = () => {
   const [offices, setOffices] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [rejectingRequestId, setRejectingRequestId] = useState(null);
   const { user } = useUser();
 
   useEffect(() => {
@@ -136,12 +139,38 @@ const PurchaseRequestsPage = () => {
   };
 
   const handleStatusUpdate = async (id, status) => {
+    if (status === "Rejected") {
+      // Show dialog to get rejection notes
+      setRejectingRequestId(id);
+      setRejectNotes("");
+      setRejectDialogOpen(true);
+      return;
+    }
+    
     try {
       await updatePurchaseRequest(id, { status });
       setRequests((prev) => prev.map(r => r.id === id ? { ...r, status } : r));
       showSnackbar(`Request ${status.toLowerCase()} successfully`, "success");
     } catch {
       showSnackbar(`Failed to ${status.toLowerCase()} request`, "error");
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectNotes.trim()) {
+      showSnackbar("Please provide rejection notes", "error");
+      return;
+    }
+    
+    try {
+      await updatePurchaseRequest(rejectingRequestId, { status: "Rejected", notes: rejectNotes });
+      setRequests((prev) => prev.map(r => r.id === rejectingRequestId ? { ...r, status: "Rejected" } : r));
+      showSnackbar("Request rejected successfully", "success");
+      setRejectDialogOpen(false);
+      setRejectNotes("");
+      setRejectingRequestId(null);
+    } catch {
+      showSnackbar("Failed to reject request", "error");
     }
   };
 
@@ -440,38 +469,32 @@ const PurchaseRequestsPage = () => {
                           <ListItemIcon>
                             <InventoryIcon color="action" />
                           </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <Typography variant="body2" fontWeight="500">
-                                  {item.item_name}
-                                </Typography>
-                                <Chip
-                                  label={item.urgency}
-                                  color={getUrgencyColor(item.urgency)}
-                                  size="small"
-                                />
-                              </Box>
-                            }
-                            secondary={
-                              <Box sx={{ mt: 0.5 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                  {item.description} • {item.quantity} {item.unit}
-                                </Typography>
-                                <Typography variant="body2" color="primary.main" fontWeight="500">
-                                  ₱{calculateItemTotal(item)} 
-                                  <Typography component="span" variant="body2" color="text.secondary">
-                                    {" "}(₱{item.estimated_unit_price} per unit)
-                                  </Typography>
-                                </Typography>
-                                {item.specifications && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    Specs: {item.specifications}
-                                  </Typography>
-                                )}
-                              </Box>
-                            }
-                          />
+                          <Box sx={{ width: "100%", py: 1 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                              <Typography variant="body2" fontWeight="500">
+                                {item.item_name}
+                              </Typography>
+                              <Chip
+                                label={item.urgency}
+                                color={getUrgencyColor(item.urgency)}
+                                size="small"
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                              {item.description} • {item.quantity} {item.unit}
+                            </Typography>
+                            <Typography variant="body2" color="primary.main" fontWeight="500">
+                              ₱{calculateItemTotal(item)} 
+                              <Typography component="span" variant="body2" color="text.secondary">
+                                {" "}(₱{item.estimated_unit_price} per unit)
+                              </Typography>
+                            </Typography>
+                            {item.specifications && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                Specs: {item.specifications}
+                              </Typography>
+                            )}
+                          </Box>
                         </ListItem>
                       ))}
                     </List>
@@ -527,6 +550,37 @@ const PurchaseRequestsPage = () => {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        {/* Reject Dialog */}
+        <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            Reject Purchase Request
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Are you sure you want to reject this purchase request?
+            </Alert>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="Rejection Notes"
+              placeholder="Explain why this request is being rejected..."
+              value={rejectNotes}
+              onChange={(e) => setRejectNotes(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleConfirmReject}
+              variant="contained" 
+              color="error"
+            >
+              Reject Request
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </DashboardLayout>
   );

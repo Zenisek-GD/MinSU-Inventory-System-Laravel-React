@@ -30,7 +30,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('categories', CategoryController::class);
         // User resource routes
         Route::apiResource('users', \App\Http\Controllers\Api\V1\UserController::class);
-        // Item resource routes
+        // Item resource routes - QR lookup must come before apiResource
+        Route::get('items/qr/{qr_code}', [ItemController::class, 'showByQr']);
         Route::apiResource('items', ItemController::class);
         // PurchaseRequest resource routes
         Route::apiResource('purchase-requests', PurchaseRequestController::class);
@@ -42,6 +43,10 @@ Route::prefix('v1')->group(function () {
         // Custom approve/reject routes for borrows
         Route::put('borrows/{borrowRecord}/approve', [\App\Http\Controllers\Api\V1\BorrowController::class, 'approve']);
         Route::put('borrows/{borrowRecord}/reject', [\App\Http\Controllers\Api\V1\BorrowController::class, 'reject']);
+        // Return processing for borrows (record returned item + stock movement)
+        Route::put('borrows/{borrowRecord}/return', [\App\Http\Controllers\Api\V1\BorrowController::class, 'returnItem']);
+        // Stock movements
+        Route::apiResource('stock-movements', \App\Http\Controllers\Api\V1\StockMovementController::class)->only(['index', 'store']);
 
         // Report routes
         Route::get('reports/items', [ReportsController::class, 'itemsReport']);

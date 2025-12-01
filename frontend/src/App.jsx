@@ -13,9 +13,15 @@ import Loading from "./components/common/Loading";
 
 import OfficesPage from "./pages/Offices";
 import PurchaseRequestsPage from "./pages/PurchaseRequests";
+import MyRequestsPage from "./pages/MyRequests";
 import InventoryPage from "./pages/Inventory";
 import QRScanner from "./pages/QRScanner";
 import ReportsPage from "./pages/Reports";
+import RequestItemPage from "./pages/RequestItem";
+import AvailableItemsPage from "./pages/AvailableItems";
+import CurrentBorrowsPage from "./pages/CurrentBorrows";
+import StockMovementsPage from "./pages/StockMovements";
+import StockDashboardPage from "./pages/StockDashboard";
 
 import { UserProvider, useUser } from "./context/UserContext.jsx";
 
@@ -97,6 +103,17 @@ const AppRoutes = () => {
             )}
           </ProtectedRoute>
         } />
+        <Route path="/my-requests" element={
+          <ProtectedRoute>
+            {user && user.role === 'staff' ? (
+              <React.Suspense fallback={<Loading />}>
+                <MyRequestsPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
         <Route path="/users" element={
           <ProtectedRoute>
             {user && user.role === 'admin' ? (
@@ -145,6 +162,43 @@ const AppRoutes = () => {
             </>
           </ProtectedRoute>
         } />
+        <Route path="/stock-movements" element={
+          <ProtectedRoute>
+            <>
+              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
+                <React.Suspense fallback={<Loading />}>
+                  <StockMovementsPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
+        <Route path="/stock-dashboard" element={
+          <ProtectedRoute>
+            <>
+              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
+                <React.Suspense fallback={<Loading />}>
+                  <StockDashboardPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </>
+          </ProtectedRoute>
+        } />
+          <Route path="/request-item" element={
+            <ProtectedRoute>
+              {user && user.role === 'staff' ? (
+                <React.Suspense fallback={<Loading />}>
+                  <RequestItemPage />
+                </React.Suspense>
+              ) : (
+                <Navigate to="/dashboard" />
+              )}
+            </ProtectedRoute>
+          } />
         <Route path="/monitoring" element={
           <ProtectedRoute>
             <>
@@ -154,6 +208,28 @@ const AppRoutes = () => {
                 <Navigate to="/dashboard" />
               )}
             </>
+          </ProtectedRoute>
+        } />
+        <Route path="/available-items" element={
+          <ProtectedRoute>
+            {user && user.role === 'staff' ? (
+              <React.Suspense fallback={<Loading />}>
+                <AvailableItemsPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
+          </ProtectedRoute>
+        } />
+        <Route path="/current-borrows" element={
+          <ProtectedRoute>
+            {user && user.role === 'staff' ? (
+              <React.Suspense fallback={<Loading />}>
+                <CurrentBorrowsPage />
+              </React.Suspense>
+            ) : (
+              <Navigate to="/dashboard" />
+            )}
           </ProtectedRoute>
         } />
         <Route path="/transaction-logs" element={

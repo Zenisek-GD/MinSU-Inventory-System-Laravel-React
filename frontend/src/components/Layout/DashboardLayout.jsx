@@ -8,6 +8,7 @@ const DashboardLayout = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const drawerWidth = 280;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -27,10 +28,10 @@ const DashboardLayout = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { md: `calc(100% - 280px)` },
+          p: { xs: 2, md: 3 },
+          width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          backgroundColor: '#f5f5f5'
+          backgroundColor: theme.palette.background.default
         }}
       >
         <Toolbar /> {/* This pushes content down below the AppBar */}

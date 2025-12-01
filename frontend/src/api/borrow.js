@@ -1,7 +1,7 @@
 import api from "../api/axios";
 
-export const fetchBorrows = async () => {
-  const response = await api.get("/borrows");
+export const fetchBorrows = async (params = {}) => {
+  const response = await api.get("/borrows", { params });
   return response.data;
 };
 
@@ -35,5 +35,12 @@ export const updateBorrow = async (id, data) => {
 
 export const deleteBorrow = async (id) => {
   const response = await api.delete(`/borrows/${id}`);
+  return response.data;
+};
+
+// Return a borrowed item (record a return, condition, notes)
+export const returnBorrow = async (id, data) => {
+  // Many backends implement this as a PUT to /borrows/{id}/return
+  const response = await api.put(`/borrows/${id}/return`, data);
   return response.data;
 };

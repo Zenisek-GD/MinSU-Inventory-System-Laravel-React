@@ -55,6 +55,7 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['admin'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
         { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['admin'] },
+        { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['admin'] },
         { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['admin'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['admin'] },
       ];
@@ -67,8 +68,7 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
         { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['supply_officer'] },
         { path: '/items', icon: <ItemsIcon />, label: 'Item Catalog', roles: ['supply_officer'] },
-        { path: '/transaction-logs', icon: <HistoryIcon />, label: 'Transaction Logs', roles: ['supply_officer'] },
-        { path: '/return-processing', icon: <CheckIcon />, label: 'Return Processing', roles: ['supply_officer'] },
+        { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['supply_officer'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['supply_officer'] },
       ];
     }
@@ -76,9 +76,9 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
     if (user?.role === 'staff') {
       return [
         ...baseItems,
-        { path: '/my-requests', icon: <HistoryIcon />, label: 'My Requests', roles: ['staff'] },
         { path: '/request-item', icon: <AddIcon />, label: 'Request Item', roles: ['staff'] },
         { path: '/borrow-item', icon: <BorrowIcon />, label: 'Borrow Item', roles: ['staff'] },
+        { path: '/current-borrows', icon: <HistoryIcon />, label: 'My Borrows', roles: ['staff'] },
         { path: '/available-items', icon: <CartIcon />, label: 'Available Items', roles: ['staff'] },
         { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['staff'] },
       ];
@@ -120,10 +120,9 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
       )}
       
       {/* Navigation Items */}
-      <List sx={{ px: 1.5, pt: 2 }}>
+        <List sx={{ px: 1.5, pt: 2 }}>
         {navItems.map((item) => (
           <ListItem
-            button
             key={item.path}
             component={Link}
             to={item.path}

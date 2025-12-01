@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use App\Services\StockService;
+use App\Models\StockMovement;
 
 class BorrowController extends Controller
 {
@@ -186,6 +188,27 @@ class BorrowController extends Controller
             // Update item status
             $item->update(['status' => 'Borrowed']);
 
+            // Record outgoing stock movement (one unit borrowed)
+            try {
+                $movementData = [
+                    'item_id' => $item->id,
+                    'change_qty' => -1,
+                    'movement_type' => 'outgoing',
+                    'reason' => 'borrow',
+                    'reference_type' => 'borrow',
+                    'reference_id' => $borrowRecord->id,
+                    'performed_by' => $request->user()->id,
+                    'from_office_id' => $item->office_id,
+                    'to_office_id' => $borrowRecord->borrowed_by,
+                    'notes' => 'Approved borrow request'
+                ];
+                // use StockService to record movement
+                app(StockService::class)->recordMovement($movementData);
+            } catch (\Exception $e) {
+                // Log but don't block approval
+                \Log::error('Failed to record stock movement on approve: ' . $e->getMessage());
+            }
+
             DB::commit();
 
             $borrowRecord->load(['item.office', 'item.category', 'borrowedBy', 'approvedBy']);
@@ -269,6 +292,26 @@ class BorrowController extends Controller
                 'status' => 'Available',
                 'condition' => $request->condition_after
             ]);
+
+            // Record incoming stock movement (item returned)
+            try {
+                $item = $borrowRecord->item;
+                $movementData = [
+                    'item_id' => $item->id,
+                    'change_qty' => 1,
+                    'movement_type' => 'incoming',
+                    'reason' => 'return',
+                    'reference_type' => 'borrow_return',
+                    'reference_id' => $borrowRecord->id,
+                    'performed_by' => $request->user()->id,
+                    'from_office_id' => $borrowRecord->borrowedBy->office_id ?? null,
+                    'to_office_id' => $item->office_id,
+                    'notes' => 'Item returned'
+                ];
+                app(StockService::class)->recordMovement($movementData);
+            } catch (\Exception $e) {
+                \Log::error('Failed to record stock movement on return: ' . $e->getMessage());
+            }
 
             DB::commit();
 

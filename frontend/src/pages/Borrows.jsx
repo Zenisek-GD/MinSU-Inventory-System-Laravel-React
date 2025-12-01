@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchBorrows,
   createBorrow,
@@ -19,6 +20,7 @@ import {
   Grid,
   Chip,
   IconButton,
+  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -33,6 +35,8 @@ import {
   ListItemIcon,
   Avatar,
 } from "@mui/material";
+import OfficeChip from '../components/UI/OfficeChip';
+import PrimaryButton from '../components/UI/PrimaryButton';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -43,6 +47,8 @@ import {
   CalendarToday as DateIcon,
   Assignment as PurposeIcon,
   Build as ConditionIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
 } from "@mui/icons-material";
 
 const BorrowsPage = () => {
@@ -58,19 +64,40 @@ const BorrowsPage = () => {
   const [items, setItems] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const { user } = useUser();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    loadBorrows();
-    loadItems();
-  }, []);
+    if (user?.id) {
+      loadBorrows();
+      loadItems();
+    }
+  }, [user?.id]);
+
+  // Handle location state (itemId) separately
+  useEffect(() => {
+    if (location?.state?.itemId && items.length > 0) {
+      const itemId = location.state.itemId;
+      const found = items.find(i => i.id === itemId);
+      if (found) {
+        setForm((f) => ({ ...f, item_id: itemId }));
+        setDialogOpen(true);
+      }
+    }
+  }, [location?.state?.itemId, items]);
 
   const loadBorrows = async () => {
     setLoading(true);
     try {
-      const data = await fetchBorrows();
-      setBorrows(data);
-    } catch {
+      // Scope borrows to current user if staff
+      const params = {};
+      if (user?.role === 'staff' && user?.id) params.user_id = user.id;
+      const data = await fetchBorrows(params);
+      const list = Array.isArray(data) ? data : data.data || [];
+      setBorrows(list);
+    } catch (err) {
       setError("Failed to load borrow records");
     } finally {
       setLoading(false);
@@ -79,8 +106,11 @@ const BorrowsPage = () => {
 
   const loadItems = async () => {
     try {
-      const data = await fetchItems();
-      setItems(data.data || []);
+      const params = {};
+      if (user?.office && user.office.id) params.office_id = user.office.id;
+      const data = await fetchItems(params);
+      const list = Array.isArray(data) ? data : data.data || [];
+      setItems(list);
     } catch {
       setItems([]);
     }
@@ -93,11 +123,22 @@ const BorrowsPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Ensure selected item has stock > 0
+      const selectedItem = items.find(i => i.id === form.item_id);
+      if (selectedItem && Number(selectedItem.stock) <= 0) {
+        showSnackbar('Selected item has no available stock', 'error');
+        return;
+      }
+
       const result = await createBorrow(form);
       setBorrows((prev) => [result.borrow_record, ...prev]);
       setForm({ item_id: "", borrow_date: "", expected_return_date: "", purpose: "" });
       setDialogOpen(false);
       showSnackbar("Borrow request submitted successfully", "success");
+      // Redirect staff to My Borrows so they can see their active borrows
+      if (user?.role === 'staff') {
+        setTimeout(() => navigate('/current-borrows'), 700);
+      }
     } catch (err) {
       showSnackbar("Failed to create borrow record", "error");
     }
@@ -109,8 +150,9 @@ const BorrowsPage = () => {
       await deleteBorrow(id);
       setBorrows((prev) => prev.filter((r) => r.id !== id));
       showSnackbar("Borrow record deleted successfully", "success");
-    } catch {
-      showSnackbar("Failed to delete borrow record", "error");
+    } catch (err) {
+      const message = err?.response?.data?.message || "Failed to delete borrow record";
+      showSnackbar(message, "error");
     }
   };
 
@@ -152,7 +194,7 @@ const BorrowsPage = () => {
       case "Approved": return <ApproveIcon />;
       case "Rejected": return <RejectIcon />;
       case "Pending": return <DateIcon />;
-      case "Returned": return <CheckCircle />;
+      case "Returned": return <ApproveIcon />;
       default: return <InventoryIcon />;
     }
   };
@@ -169,23 +211,40 @@ const BorrowsPage = () => {
           <Typography variant="h4" gutterBottom fontWeight="700">
             Borrow Management
           </Typography>
-          <Typography variant="h6" color="text.secondary">
-            Track and manage item borrow requests
-          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Typography variant="h6" color="text.secondary">Track and manage item borrow requests</Typography>
+            {user?.office && <OfficeChip office={user.office} locked />}
+          </Box>
         </Box>
 
         {/* Action Bar */}
-        <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Box sx={{ mb: 4, display: "flex", gap: 2, alignItems: "center" }}>
           {user?.role === "staff" && (
-            <Button
-              variant="contained"
+            <PrimaryButton
               startIcon={<AddIcon />}
               onClick={() => setDialogOpen(true)}
               sx={{ borderRadius: 2 }}
             >
               New Borrow Request
-            </Button>
+            </PrimaryButton>
           )}
+          <Box sx={{ ml: 'auto', display: 'flex', gap: 2 }}>
+            <TextField
+              size="small"
+              placeholder="Search borrower or item..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: 'grey.500' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: 200, sm: 320 } }}
+            />
+            <Button variant="outlined" startIcon={<FilterIcon />}>Filter</Button>
+          </Box>
         </Box>
 
         {/* Create Borrow Request Dialog */}
@@ -196,9 +255,7 @@ const BorrowsPage = () => {
           fullWidth
         >
           <DialogTitle>
-            <Typography variant="h6" fontWeight="600">
-              New Borrow Request
-            </Typography>
+            New Borrow Request
           </DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
@@ -218,14 +275,38 @@ const BorrowsPage = () => {
                       <MenuItem key={item.id} value={item.id}>
                         <Box>
                           <Typography variant="body1">{item.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Stock: {item.stock} • {item.category}
+                          <Typography component="div" variant="caption" color="text.secondary">
+                            Stock: {item.stock} • {item.category?.name || item.category}
                           </Typography>
                         </Box>
                       </MenuItem>
                     ))}
                   </TextField>
                 </Grid>
+                {/* Selected item quick info */}
+                {form.item_id && (
+                  <Grid item xs={12}>
+                    <Box sx={{ p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
+                      <Typography variant="subtitle1">Selected Item</Typography>
+                      {(() => {
+                        const sel = items.find(i => i.id === form.item_id);
+                        if (!sel) return <Typography variant="body2">Loading item...</Typography>;
+                        return (
+                          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
+                            <Box>
+                              <Typography variant="body1" fontWeight={600}>{sel.name}</Typography>
+                              <Typography variant="body2" color="text.secondary">{sel.category?.name || sel.category}</Typography>
+                            </Box>
+                            <Box sx={{ ml: 'auto', textAlign: 'right' }}>
+                              <Typography variant="h6" color={Number(sel.stock) <= 0 ? 'error.main' : 'text.primary'}>{sel.stock}</Typography>
+                              <Typography variant="caption" color="text.secondary">Available</Typography>
+                            </Box>
+                          </Box>
+                        );
+                      })()}
+                    </Box>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -284,6 +365,10 @@ const BorrowsPage = () => {
         ) : error ? (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
+          </Alert>
+        ) : borrows.length === 0 ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            No borrow records found. {user?.role === 'staff' && 'Click "New Borrow Request" to create one.'}
           </Alert>
         ) : (
           <Grid container spacing={3}>
@@ -359,21 +444,23 @@ const BorrowsPage = () => {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                           <DateIcon color="action" />
                           <Box>
-                            <Typography 
-                              variant="body2" 
-                              fontWeight="500"
-                              color={isOverdue(br.expected_return_date) ? "error" : "text.primary"}
-                            >
-                              {br.expected_return_date ? new Date(br.expected_return_date).toLocaleDateString() : 'N/A'}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography 
+                                component="div"
+                                variant="body2" 
+                                fontWeight="500"
+                                color={isOverdue(br.expected_return_date) ? "error" : "text.primary"}
+                              >
+                                {br.expected_return_date ? new Date(br.expected_return_date).toLocaleDateString() : 'N/A'}
+                              </Typography>
                               {isOverdue(br.expected_return_date) && (
                                 <Chip 
                                   label="Overdue" 
                                   color="error" 
                                   size="small" 
-                                  sx={{ ml: 1 }}
                                 />
                               )}
-                            </Typography>
+                            </Box>
                             <Typography variant="body2" color="text.secondary">
                               Expected Return
                             </Typography>
@@ -428,16 +515,18 @@ const BorrowsPage = () => {
                           </Button>
                         </>
                       )}
-                      <Button
-                        startIcon={<DeleteIcon />}
-                        variant="outlined"
-                        color="error"
-                        size="small"
-                        onClick={() => handleDelete(br.id)}
-                        sx={{ ml: "auto" }}
-                      >
-                        Delete Record
-                      </Button>
+                      {(br.status === 'Pending' && (user?.role === 'supply_officer' || user?.id === br.borrowedBy?.id || user?.id === br.borrowed_by)) && (
+                        <Button
+                          startIcon={<DeleteIcon />}
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          onClick={() => handleDelete(br.id)}
+                          sx={{ ml: "auto" }}
+                        >
+                          Delete Record
+                        </Button>
+                      )}
                     </Box>
                   </CardContent>
                 </Card>

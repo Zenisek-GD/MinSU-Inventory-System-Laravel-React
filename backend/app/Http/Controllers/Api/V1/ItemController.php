@@ -11,7 +11,7 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::with(['office', 'category']);
+        $query = Item::with(['office', 'category', 'borrowRecords.borrowedBy']);
 
         // Filter by office
         if ($request->has('office_id')) {
@@ -34,6 +34,25 @@ class ItemController extends Controller
         }
 
         $items = $query->latest()->get();
+
+        // Add current borrow information to each item
+        $items->each(function ($item) {
+            $currentBorrow = $item->borrowRecords->where('status', 'Approved')->first();
+            $item->currentBorrow = $currentBorrow ? [
+                'id' => $currentBorrow->id,
+                'status' => $currentBorrow->status,
+                'borrowedBy' => $currentBorrow->borrowedBy,
+                'borrowed_at' => $currentBorrow->created_at,
+                'expected_return_date' => $currentBorrow->expected_return_date
+            ] : null;
+
+            // Update display status based on borrow records
+            if ($currentBorrow) {
+                $item->display_status = 'Borrowed';
+            } else {
+                $item->display_status = $item->status;
+            }
+        });
 
         return response()->json(['data' => $items]);
     }
@@ -104,12 +123,14 @@ class ItemController extends Controller
         $item = Item::with([
             'office',
             'category',
-            'borrowRecords.user',
+            'borrowRecords.borrowedBy',
             'conditionAudits' => function ($query) {
                 $query->latest()->limit(5);
-            },
-            'currentBorrow.user'
+            }
         ])->where('qr_code', $qr_code)->firstOrFail();
+
+        // Add current borrow as an accessor (not eager loaded)
+        $item->current_borrow = $item->getCurrentBorrowAttribute();
 
         return response()->json($item);
     }
