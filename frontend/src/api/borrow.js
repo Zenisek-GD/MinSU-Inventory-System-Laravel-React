@@ -5,6 +5,11 @@ export const fetchBorrows = async (params = {}) => {
   return response.data;
 };
 
+export const fetchBorrowRecords = async (params = {}) => {
+  const response = await api.get("/borrows", { params });
+  return response.data;
+};
+
 export const createBorrow = async (data) => {
   const response = await api.post("/borrows", data);
   return response.data;

@@ -6,9 +6,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import AdminDashboard from "./pages/Dashboard/AdminDashboard";
-import SupplyOfficerDashboard from "./pages/Dashboard/SupplyOfficerDashboard";
-import StaffDashboard from "./pages/Dashboard/StaffDashboard";
+import Dashboard from "./pages/Dashboard";
 import Loading from "./components/common/Loading";
 
 import OfficesPage from "./pages/Offices";
@@ -28,16 +26,6 @@ import { UserProvider, useUser } from "./context/UserContext.jsx";
 // AppRoutes uses the user context
 const AppRoutes = () => {
   const { user, loading } = useUser();
-
-  const RoleBasedDashboard = () => {
-    if (!user) return <Navigate to="/login" />;
-    switch (user.role) {
-      case 'admin': return <AdminDashboard />;
-      case 'supply_officer': return <SupplyOfficerDashboard />;
-      case 'staff': return <StaffDashboard />;
-      default: return <Navigate to="/login" />;
-    }
-  };
 
   const ProtectedRoute = ({ children }) => {
     if (loading) return <Loading />;
@@ -78,7 +66,7 @@ const AppRoutes = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <RoleBasedDashboard />
+            <Dashboard />
           </ProtectedRoute>
         } />
         <Route path="/offices" element={
