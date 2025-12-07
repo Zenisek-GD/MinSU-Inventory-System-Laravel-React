@@ -1,5 +1,5 @@
 import BorrowsPage from "./pages/Borrows";
-import ItemsPage from "./pages/Items";
+import ItemsInventoryPage from "./pages/ItemsInventory";
 import CategoriesPage from "./pages/Categories";
 import UsersPage from "./pages/Users";
 import React from "react";
@@ -12,7 +12,7 @@ import Loading from "./components/common/Loading";
 import OfficesPage from "./pages/Offices";
 import PurchaseRequestsPage from "./pages/PurchaseRequests";
 import MyRequestsPage from "./pages/MyRequests";
-import InventoryPage from "./pages/Inventory";
+// Inventory merged into ItemsInventory
 import QRScanner from "./pages/QRScanner";
 import ReportsPage from "./pages/Reports";
 import RequestItemPage from "./pages/RequestItem";
@@ -40,15 +40,9 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/borrows" element={
           <ProtectedRoute>
-            <>
-              {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
-                <React.Suspense fallback={<Loading />}>
-                  <BorrowsPage />
-                </React.Suspense>
-              ) : (
-                <Navigate to="/dashboard" />
-              )}
-            </>
+            <React.Suspense fallback={<Loading />}>
+              <BorrowsPage />
+            </React.Suspense>
           </ProtectedRoute>
         } />
         <Route path="/borrow-item" element={
@@ -129,7 +123,7 @@ const AppRoutes = () => {
             <>
               {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                 <React.Suspense fallback={<Loading />}>
-                  <ItemsPage />
+                  <ItemsInventoryPage />
                 </React.Suspense>
               ) : (
                 <Navigate to="/dashboard" />
@@ -142,7 +136,7 @@ const AppRoutes = () => {
             <>
               {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                 <React.Suspense fallback={<Loading />}>
-                  <InventoryPage />
+                  <ItemsInventoryPage />
                 </React.Suspense>
               ) : (
                 <Navigate to="/dashboard" />

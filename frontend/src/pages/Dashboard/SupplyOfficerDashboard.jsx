@@ -111,7 +111,8 @@ const SupplyOfficerDashboard = () => {
     fetchData();
     let interval;
     if (autoRefresh) {
-      interval = setInterval(fetchData, refreshInterval * 1000);
+      const seconds = Math.max(15, Number(refreshInterval) || 30); // enforce minimum 15s
+      interval = setInterval(fetchData, seconds * 1000);
     }
     return () => interval && clearInterval(interval);
   }, [autoRefresh, refreshInterval]);

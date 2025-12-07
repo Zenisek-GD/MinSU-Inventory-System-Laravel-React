@@ -76,15 +76,19 @@ export default function RequestItemPage(){
 
   const openRequestDialog = (item) => {
     setSelected(item);
-    setForm({ office_id: item.office_id || '', purpose: `Request for ${item.name}`, items: [{
-      item_name: item.name,
-      description: item.description || '',
-      quantity: 1,
-      unit: item.unit || '',
-      estimated_unit_price: item.purchase_price || 0,
-      urgency: 'Medium',
-      specifications: ''
-    }] });
+    setForm({ 
+      office_id: item.office_id || user?.office?.id || '', 
+      purpose: `Request for ${item.name}`, 
+      items: [{
+        item_name: item.name,
+        description: item.description || '',
+        quantity: 1,
+        unit: item.unit || 'piece',
+        estimated_unit_price: item.purchase_price || 0,
+        urgency: 'Medium',
+        specifications: ''
+      }] 
+    });
     setDialogOpen(true);
   };
 
@@ -98,12 +102,51 @@ export default function RequestItemPage(){
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate
+    if (!form.office_id) {
+      setSnackbar({ open: true, message: 'Please select an office', severity: 'error' });
+      return;
+    }
+    if (!form.purpose || form.purpose.trim() === '') {
+      setSnackbar({ open: true, message: 'Please enter a purpose', severity: 'error' });
+      return;
+    }
+    
+    // Validate items
+    for (let i = 0; i < form.items.length; i++) {
+      const item = form.items[i];
+      if (!item.item_name || item.item_name.trim() === '') {
+        setSnackbar({ open: true, message: `Item ${i+1}: Please enter item name`, severity: 'error' });
+        return;
+      }
+      if (!item.unit || item.unit.trim() === '') {
+        setSnackbar({ open: true, message: `Item ${i+1}: Please enter unit`, severity: 'error' });
+        return;
+      }
+      if (!item.urgency) {
+        setSnackbar({ open: true, message: `Item ${i+1}: Please select urgency`, severity: 'error' });
+        return;
+      }
+    }
+    
     try {
+      console.log('Submitting PR:', form);
       const res = await createPurchaseRequest(form);
-      setSnackbar({ open: true, message: 'Request submitted', severity: 'success' });
+      setSnackbar({ open: true, message: 'Request submitted successfully', severity: 'success' });
       setDialogOpen(false);
+      loadAll(); // Reload to show new request
     } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to submit request', severity: 'error' });
+      console.error('PR submission error:', err);
+      console.error('Error response:', err.response?.data);
+      const errorMsg = err.response?.data?.message || 'Failed to submit request';
+      const errors = err.response?.data?.errors;
+      if (errors) {
+        const firstError = Object.values(errors)[0];
+        setSnackbar({ open: true, message: firstError[0] || errorMsg, severity: 'error' });
+      } else {
+        setSnackbar({ open: true, message: errorMsg, severity: 'error' });
+      }
     }
   };
 

@@ -24,12 +24,14 @@ class Item extends Model
         'safety_stock',
         'unit',
         'warranty_expiry',
-        'notes'
+        'notes',
+        'last_condition_check'
     ];
 
     protected $casts = [
         'purchase_date' => 'date',
         'warranty_expiry' => 'date',
+        'last_condition_check' => 'date',
         'purchase_price' => 'decimal:2',
     ];
 

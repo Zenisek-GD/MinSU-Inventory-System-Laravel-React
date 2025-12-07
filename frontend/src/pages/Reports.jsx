@@ -3,14 +3,83 @@ import DashboardLayout from '../components/Layout/DashboardLayout';
 import { fetchItemsReport } from '../api/reports';
 import { fetchOffices } from '../api/office';
 import { fetchCategories } from '../api/category';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Grid,
+  TextField,
+  MenuItem,
+  Button,
+  IconButton,
+  Alert,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Stack,
+  Divider,
+  alpha,
+  useTheme,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  TablePagination,
+  Fade,
+  LinearProgress,
+  InputAdornment
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  Download as DownloadIcon,
+  Print as PrintIcon,
+  PictureAsPdf as PdfIcon,
+  BarChart as ChartIcon,
+  Refresh as RefreshIcon,
+  DateRange as DateIcon,
+  Business as OfficeIcon,
+  Category as CategoryIcon,
+  CheckCircle as CheckIcon,
+  Schedule as ScheduleIcon,
+  Block as BlockIcon,
+  TrendingUp as TrendingUpIcon,
+  AttachMoney as MoneyIcon,
+  Inventory as InventoryIcon,
+  ArrowDropDown as ArrowDropDownIcon,
+  Description as DescriptionIcon,
+  CloudDownload as CloudDownloadIcon,
+  Assessment as AssessmentIcon
+} from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 const ReportsPage = () => {
-  const [filters, setFilters] = useState({ start_date: '', end_date: '', office_id: '', category_id: '', status: '' });
+  const theme = useTheme();
+  const [filters, setFilters] = useState({ 
+    start_date: null, 
+    end_date: null, 
+    office_id: '', 
+    category_id: '', 
+    status: '' 
+  });
   const [data, setData] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [offices, setOffices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [reportType, setReportType] = useState('detailed');
+  const [chartView, setChartView] = useState(false);
 
   useEffect(() => {
     loadLookups();
@@ -34,10 +103,22 @@ const ReportsPage = () => {
   const runReport = async () => {
     setLoading(true);
     try {
-      const res = await fetchItemsReport(filters);
+      const formattedFilters = {
+        ...filters,
+        start_date: filters.start_date ? new Date(filters.start_date).toISOString().split('T')[0] : '',
+        end_date: filters.end_date ? new Date(filters.end_date).toISOString().split('T')[0] : ''
+      };
+      const res = await fetchItemsReport(formattedFilters);
       setData(res?.data || res || []);
-      setStats(res?.stats || null);
+      setStats(res?.stats || {
+        total_items: data.length,
+        available: data.filter(item => item.status === 'Available').length,
+        borrowed: data.filter(item => item.status === 'Borrowed').length,
+        inactive: data.filter(item => item.status === 'Inactive').length,
+        total_value: data.reduce((sum, item) => sum + (parseFloat(item.purchase_price) || 0), 0)
+      });
     } catch (e) {
+      console.error('Report error:', e);
       setData([]);
       setStats(null);
     } finally {
@@ -45,258 +126,716 @@ const ReportsPage = () => {
     }
   };
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (!data || data.length === 0) return;
-    const headers = ['ID', 'Name', 'Category', 'Office', 'Serial Number', 'Status', 'Purchase Date', 'Purchase Price'];
-    const rows = data.map(r => [
-      r.id,
-      r.name,
-      r.category?.name || '',
-      r.office?.name || '',
-      r.serial_number || '',
-      r.status || '',
-      r.purchase_date || '',
-      r.purchase_price || ''
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `items-report-${new Date().toISOString().slice(0,10)}.csv`);
-    link.click();
+    setExportLoading(true);
+    try {
+      const headers = ['ID', 'Name', 'Category', 'Office', 'Serial Number', 'Status', 'Purchase Date', 'Purchase Price'];
+      const rows = data.map(r => [
+        r.id,
+        r.name,
+        r.category?.name || '',
+        r.office?.name || '',
+        r.serial_number || '',
+        r.status || '',
+        r.purchase_date || '',
+        r.purchase_price || ''
+      ]);
+      const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `inventory-report-${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const exportPDF = () => {
+    // Implement PDF export logic
+    console.log('Export PDF');
   };
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Available': return 'success';
+      case 'Borrowed': return 'warning';
+      case 'Inactive': return 'error';
+      default: return 'default';
+    }
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ start_date: null, end_date: null, office_id: '', category_id: '', status: '' });
+    setPage(0);
+  };
+
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="mb-4">
-          <nav className="text-sm text-gray-500 mb-2" aria-label="Breadcrumb">
-            <ol className="list-none p-0 inline-flex">
-              <li className="flex items-center">
-                <span className="text-gray-400">Dashboard</span>
-                <svg className="w-3 h-3 mx-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </li>
-              <li className="flex items-center text-gray-700 font-semibold">Reports</li>
-            </ol>
-          </nav>
-          <h1 className="text-3xl font-bold mb-2">Admin Reports</h1>
-          <p className="text-gray-600 mb-6">Generate and export inventory reports with filters</p>
-        </div>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <Box sx={{ p: 4 }}>
+          {/* Header */}
+          <Box sx={{ mb: 6 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+              <Box>
+                <Typography 
+                  variant="h4" 
+                  fontWeight={800} 
+                  gutterBottom
+                  sx={{ 
+                    color: 'text.primary',
+                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}
+                >
+                  Reports Dashboard
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  Generate detailed inventory reports and analytics
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={clearFilters}
+                  sx={{ borderRadius: 3 }}
+                >
+                  Clear Filters
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AssessmentIcon />}
+                  onClick={runReport}
+                  disabled={loading}
+                  sx={{
+                    borderRadius: 3,
+                    fontWeight: 600,
+                    bgcolor: theme.palette.primary.main,
+                    '&:hover': { bgcolor: theme.palette.primary.dark }
+                  }}
+                >
+                  {loading ? 'Running...' : 'Generate Report'}
+                </Button>
+              </Stack>
+            </Box>
 
-        {/* Filter Card */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-3">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
-            Report Filters
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-              <input 
-                type="date" 
-                value={filters.start_date} 
-                onChange={e => setFilters({...filters, start_date: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-              <input 
-                type="date" 
-                value={filters.end_date} 
-                onChange={e => setFilters({...filters, end_date: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Office</label>
-              <select 
-                value={filters.office_id} 
-                onChange={e => setFilters({...filters, office_id: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {/* Report Type Toggle */}
+            <Box sx={{ mb: 4 }}>
+              <ToggleButtonGroup
+                value={reportType}
+                exclusive
+                onChange={(e, value) => value && setReportType(value)}
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    px: 3,
+                    py: 1,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                    '&.Mui-selected': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main,
+                      borderColor: theme.palette.primary.main,
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.primary.main, 0.15)
+                      }
+                    }
+                  }
+                }}
               >
-                <option value="">All Offices</option>
-                {offices.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select 
-                value={filters.category_id} 
-                onChange={e => setFilters({...filters, category_id: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <ToggleButton value="detailed">
+                  <DescriptionIcon sx={{ mr: 1 }} />
+                  Detailed Report
+                </ToggleButton>
+                <ToggleButton value="summary">
+                  <ChartIcon sx={{ mr: 1 }} />
+                  Summary View
+                </ToggleButton>
+                <ToggleButton value="analytics">
+                  <TrendingUpIcon sx={{ mr: 1 }} />
+                  Analytics
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          </Box>
+
+          {/* Filters Card */}
+          <Card 
+            elevation={0}
+            sx={{
+              mb: 4,
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              bgcolor: alpha(theme.palette.primary.main, 0.02)
+            }}
+          >
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <FilterIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
+                <Typography variant="h6" fontWeight={700}>
+                  Report Filters
+                </Typography>
+              </Box>
+
+              <Grid container spacing={3}>
+                {/* Date Filters */}
+                <Grid item xs={12} md={6} lg={3}>
+                  <DatePicker
+                    label="Start Date"
+                    value={filters.start_date}
+                    onChange={(date) => handleFilterChange('start_date', date)}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        size="small"
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <DateIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} lg={3}>
+                  <DatePicker
+                    label="End Date"
+                    value={filters.end_date}
+                    onChange={(date) => handleFilterChange('end_date', date)}
+                    renderInput={(params) => (
+                      <TextField {...params} fullWidth size="small" />
+                    )}
+                  />
+                </Grid>
+
+                {/* Office Filter */}
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Office"
+                    value={filters.office_id}
+                    onChange={(e) => handleFilterChange('office_id', e.target.value)}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <OfficeIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  >
+                    <MenuItem value="">All Offices</MenuItem>
+                    {offices.map((office) => (
+                      <MenuItem key={office.id} value={office.id}>
+                        {office.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+
+                {/* Category Filter */}
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Category"
+                    value={filters.category_id}
+                    onChange={(e) => handleFilterChange('category_id', e.target.value)}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CategoryIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  >
+                    <MenuItem value="">All Categories</MenuItem>
+                    {categories.map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+
+                {/* Status Filter */}
+                <Grid item xs={12} md={6} lg={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Status"
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    size="small"
+                  >
+                    <MenuItem value="">All Status</MenuItem>
+                    <MenuItem value="Available">Available</MenuItem>
+                    <MenuItem value="Borrowed">Borrowed</MenuItem>
+                    <MenuItem value="Inactive">Inactive</MenuItem>
+                  </TextField>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Stats Summary */}
+          {stats && (
+            <Fade in={!!stats}>
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card 
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                      bgcolor: alpha(theme.palette.info.main, 0.05)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: theme.palette.info.main
+                        }}
+                      >
+                        <InventoryIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800}>
+                          {stats.total_items}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Items
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card 
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                      bgcolor: alpha(theme.palette.success.main, 0.05)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.success.main, 0.1),
+                          color: theme.palette.success.main
+                        }}
+                      >
+                        <CheckIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800}>
+                          {stats.available}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Available
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card 
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+                      bgcolor: alpha(theme.palette.warning.main, 0.05)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.warning.main, 0.1),
+                          color: theme.palette.warning.main
+                        }}
+                      >
+                        <ScheduleIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800}>
+                          {stats.borrowed}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Borrowed
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card 
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
+                      bgcolor: alpha(theme.palette.error.main, 0.05)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.error.main, 0.1),
+                          color: theme.palette.error.main
+                        }}
+                      >
+                        <BlockIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800}>
+                          {stats.inactive}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Inactive
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <Card 
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                      bgcolor: alpha(theme.palette.success.main, 0.05)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.success.main, 0.1),
+                          color: theme.palette.success.main
+                        }}
+                      >
+                        <MoneyIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800}>
+                          ₱{(stats.total_value || 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Value
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Card>
+                </Grid>
+              </Grid>
+            </Fade>
+          )}
+
+          {/* Report Table */}
+          <Card 
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              overflow: 'hidden'
+            }}
+          >
+            <Box sx={{ 
+              p: 3, 
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+              bgcolor: alpha(theme.palette.background.default, 0.5)
+            }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AssessmentIcon sx={{ color: theme.palette.primary.main }} />
+                  <Box>
+                    <Typography variant="h6" fontWeight={700}>
+                      Report Results
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {data.length} items found
+                    </Typography>
+                  </Box>
+                </Box>
+                <Stack direction="row" spacing={2}>
+                  <Tooltip title="Export CSV">
+                    <IconButton
+                      onClick={exportCsv}
+                      disabled={!data.length || exportLoading}
+                      sx={{
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                      }}
+                    >
+                      {exportLoading ? <CircularProgress size={24} /> : <CloudDownloadIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Export PDF">
+                    <IconButton
+                      onClick={exportPDF}
+                      disabled={!data.length}
+                      sx={{
+                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.2) }
+                      }}
+                    >
+                      <PdfIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Print Report">
+                    <IconButton
+                      onClick={handlePrint}
+                      disabled={!data.length}
+                      sx={{
+                        bgcolor: alpha(theme.palette.grey[500], 0.1),
+                        '&:hover': { bgcolor: alpha(theme.palette.grey[500], 0.2) }
+                      }}
+                    >
+                      <PrintIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              </Box>
+            </Box>
+
+            <TableContainer>
+              {loading ? (
+                <Box sx={{ p: 8, textAlign: 'center' }}>
+                  <CircularProgress size={60} sx={{ mb: 3 }} />
+                  <Typography variant="h6" color="text.secondary">
+                    Generating Report...
+                  </Typography>
+                  <LinearProgress sx={{ mt: 2, maxWidth: 400, mx: 'auto' }} />
+                </Box>
+              ) : data.length === 0 ? (
+                <Box sx={{ p: 8, textAlign: 'center' }}>
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      p: 3,
+                      borderRadius: '50%',
+                      bgcolor: alpha(theme.palette.divider, 0.1),
+                      mb: 3
+                    }}
+                  >
+                    <AssessmentIcon sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.3) }} />
+                  </Box>
+                  <Typography variant="h6" color="text.secondary" gutterBottom fontWeight={600}>
+                    No Data Available
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+                    Run a report using the filters above to see inventory data
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<RefreshIcon />}
+                    onClick={runReport}
+                    sx={{ borderRadius: 3 }}
+                  >
+                    Generate Report
+                  </Button>
+                </Box>
+              ) : (
+                <>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Item Name</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Office</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Serial No.</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Purchase Date</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Purchase Price</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {data
+                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                        .map((row, index) => (
+                          <TableRow 
+                            key={row.id || index}
+                            hover
+                            sx={{ 
+                              '&:hover': {
+                                bgcolor: alpha(theme.palette.primary.main, 0.02)
+                              }
+                            }}
+                          >
+                            <TableCell>
+                              <Typography variant="body2" color="text.secondary">
+                                {page * rowsPerPage + index + 1}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body1" fontWeight={600}>
+                                {row.name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={row.category?.name || 'N/A'}
+                                size="small"
+                                sx={{ 
+                                  bgcolor: alpha(theme.palette.info.main, 0.1),
+                                  color: theme.palette.info.main
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {row.office?.name || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontFamily="monospace">
+                                {row.serial_number || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={row.status || 'N/A'}
+                                size="small"
+                                color={getStatusColor(row.status)}
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {row.purchase_date ? new Date(row.purchase_date).toLocaleDateString() : 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body1" fontWeight={700} color="success.main">
+                                ₱{row.purchase_price?.toLocaleString() || '0'}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    component="div"
+                    count={data.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    sx={{
+                      borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                    }}
+                  />
+                </>
+              )}
+            </TableContainer>
+          </Card>
+
+          {/* Export Buttons Footer */}
+          {data.length > 0 && (
+            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center', gap: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<CloudDownloadIcon />}
+                onClick={exportCsv}
+                disabled={exportLoading}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 3,
+                  borderColor: theme.palette.primary.main,
+                  color: theme.palette.primary.main
+                }}
               >
-                <option value="">All Categories</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select 
-                value={filters.status} 
-                onChange={e => setFilters({...filters, status: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {exportLoading ? 'Exporting...' : 'Export CSV'}
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<PdfIcon />}
+                onClick={exportPDF}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 3,
+                  bgcolor: theme.palette.error.main,
+                  '&:hover': { bgcolor: theme.palette.error.dark }
+                }}
               >
-                <option value="">All Statuses</option>
-                <option value="Available">Available</option>
-                <option value="Borrowed">Borrowed</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2 flex-wrap items-center">
-            <button 
-              onClick={runReport} 
-              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17a4 4 0 100-8 4 4 0 000 8zM21 21l-4.35-4.35"/></svg>
-              Run Report
-            </button>
-            <button 
-              onClick={exportCsv} 
-              disabled={!data || data.length === 0}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14"/></svg>
-              Export CSV
-            </button>
-            <button 
-              onClick={handlePrint}
-              disabled={!data || data.length === 0}
-              className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7M6 22h12v-7H6v7z"/></svg>
-              Print / PDF
-            </button>
-            <div className="ml-auto text-sm text-gray-500">{data?.length ? `${data.length} results` : 'No results'}</div>
-          </div>
-        </div>
-
-        {/* Summary Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-blue-50 flex items-center justify-center text-blue-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18"/></svg>
-              </div>
-              <div>
-                <div className="text-gray-600 text-sm font-medium">Total Items</div>
-                <div className="text-2xl font-bold text-blue-600">{stats.total_items}</div>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-green-50 flex items-center justify-center text-green-600">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3"/></svg>
-              </div>
-              <div>
-                <div className="text-gray-600 text-sm font-medium">Available</div>
-                <div className="text-2xl font-bold text-green-600">{stats.available}</div>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-orange-50 flex items-center justify-center text-orange-600">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18"/></svg>
-              </div>
-              <div>
-                <div className="text-gray-600 text-sm font-medium">Borrowed</div>
-                <div className="text-2xl font-bold text-orange-600">{stats.borrowed}</div>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-red-50 flex items-center justify-center text-red-600">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.36 6.64l-12.72 12.72"/></svg>
-              </div>
-              <div>
-                <div className="text-gray-600 text-sm font-medium">Inactive</div>
-                <div className="text-2xl font-bold text-red-600">{stats.inactive}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Report Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Items Data</h2>
-            <div className="ml-auto flex items-center gap-2">
-              <button onClick={exportCsv} disabled={!data || data.length === 0} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-3 py-1.5 rounded-md text-sm">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14"/></svg>
-                Export
-              </button>
-              <button onClick={handlePrint} disabled={!data || data.length === 0} className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 text-white px-3 py-1.5 rounded-md text-sm">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9V2h12v7M6 22h12v-7H6v7z"/></svg>
-                Print
-              </button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-gray-600 mt-2">Loading report...</p>
-              </div>
-            ) : data.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p>No data found. Run a report to see results.</p>
-              </div>
-            ) : (
-              <table className="w-full min-w-full text-sm table-auto">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">#</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Name</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Category</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Office</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Serial #</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Status</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Purchase Date</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-700 sticky top-0 bg-white z-10">Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((row, idx) => (
-                    <tr key={row.id || idx} className={`border-b transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}>
-                      <td className="px-6 py-3 text-gray-900">{idx+1}</td>
-                      <td className="px-6 py-3 text-gray-900 font-medium">{row.name}</td>
-                      <td className="px-6 py-3 text-gray-700">{row.category?.name || '-'}</td>
-                      <td className="px-6 py-3 text-gray-700">{row.office?.name || '-'}</td>
-                      <td className="px-6 py-3 text-gray-700">{row.serial_number || '-'}</td>
-                      <td className="px-6 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          row.status === 'Available' ? 'bg-green-100 text-green-800' :
-                          row.status === 'Borrowed' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-gray-700">{row.purchase_date || '-'}</td>
-                      <td className="px-6 py-3 text-gray-700 font-medium">₱{row.purchase_price || '0'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Print Styles */}
-        <style>{`
-          @media print {
-            .no-print { display: none; }
-            body { background: white; }
-            .bg-white { page-break-inside: avoid; }
-            table { page-break-inside: avoid; }
-          }
-        `}</style>
-      </div>
+                Export PDF
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<PrintIcon />}
+                onClick={handlePrint}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 3,
+                  bgcolor: theme.palette.grey[600],
+                  '&:hover': { bgcolor: theme.palette.grey[700] }
+                }}
+              >
+                Print Report
+              </Button>
+            </Box>
+          )}
+        </Box>
+      </LocalizationProvider>
     </DashboardLayout>
   );
 };
+
+// Helper components
+const Avatar = ({ children, sx, ...props }) => (
+  <Box
+    sx={{
+      width: 48,
+      height: 48,
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...sx
+    }}
+    {...props}
+  >
+    {children}
+  </Box>
+);
 
 export default ReportsPage;

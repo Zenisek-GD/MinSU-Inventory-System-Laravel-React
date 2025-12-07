@@ -120,14 +120,58 @@ const PurchaseRequestsPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    if (!form.office_id) {
+      showSnackbar("Please select an office", "error");
+      return;
+    }
+    if (!form.purpose || form.purpose.trim() === "") {
+      showSnackbar("Please enter a purpose", "error");
+      return;
+    }
+    if (!form.items || form.items.length === 0) {
+      showSnackbar("Please add at least one item", "error");
+      return;
+    }
+    
+    // Validate each item
+    for (let i = 0; i < form.items.length; i++) {
+      const item = form.items[i];
+      if (!item.item_name || item.item_name.trim() === "") {
+        showSnackbar(`Item ${i + 1}: Please enter item name`, "error");
+        return;
+      }
+      if (!item.quantity || item.quantity < 1) {
+        showSnackbar(`Item ${i + 1}: Quantity must be at least 1`, "error");
+        return;
+      }
+      if (!item.unit || item.unit.trim() === "") {
+        showSnackbar(`Item ${i + 1}: Please enter unit`, "error");
+        return;
+      }
+      if (item.estimated_unit_price === null || item.estimated_unit_price === undefined || item.estimated_unit_price < 0) {
+        showSnackbar(`Item ${i + 1}: Please enter valid price`, "error");
+        return;
+      }
+      if (!item.urgency) {
+        showSnackbar(`Item ${i + 1}: Please select urgency`, "error");
+        return;
+      }
+    }
+    
     try {
+      console.log('Submitting PR with data:', form);
       const result = await createPurchaseRequest(form);
       setRequests((prev) => [result.purchase_request, ...prev]);
       setForm({ office_id: "", purpose: "", items: [{ ...defaultItem }] });
       setDialogOpen(false);
       showSnackbar("Purchase request created successfully", "success");
-    } catch {
-      showSnackbar("Failed to create purchase request", "error");
+    } catch (err) {
+      console.error('PR submission error:', err);
+      console.error('Error response:', err.response?.data);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to create purchase request";
+      showSnackbar(errorMsg, "error");
     }
   };
 

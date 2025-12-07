@@ -10,14 +10,16 @@ class Office extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 
-        'qr_code', 
-        'description', 
-        'location'
+        'name',
+        'qr_code',
+        'description',
+        'location',
+        'rooms',
+        'laboratories'
     ];
 
 
-     // Relationships
+    // Relationships
     public function users()
     {
         return $this->hasMany(User::class);
@@ -32,7 +34,7 @@ class Office extends Model
 
 
 
-     // Scopes
+    // Scopes
     public function scopeActive($query)
     {
         return $query->whereHas('users', function ($q) {

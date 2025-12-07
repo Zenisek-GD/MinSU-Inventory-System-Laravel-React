@@ -87,6 +87,8 @@ export default function Dashboard() {
   const [borrows, setBorrows] = useState([]);
   const [movements, setMovements] = useState([]);
   const [purchaseRequests, setPurchaseRequests] = useState([]);
+  // Admin analytics filter
+  const [adminTimeRange, setAdminTimeRange] = useState('Daily');
 
   // Supply Officer filters
   const [filterStatus, setFilterStatus] = useState('All');
@@ -105,7 +107,8 @@ export default function Dashboard() {
     if (!user) return;
     let interval;
     if (autoRefresh && user.role === 'supply_officer') {
-      interval = setInterval(loadDashboardData, refreshInterval * 1000);
+      const seconds = Math.max(15, Number(refreshInterval) || 30); // enforce minimum 15s
+      interval = setInterval(loadDashboardData, seconds * 1000);
     }
     return () => interval && clearInterval(interval);
   }, [autoRefresh, refreshInterval, user]);
@@ -150,7 +153,20 @@ export default function Dashboard() {
 
   // Render based on role
   if (user.role === 'admin') {
-    return <AdminDashboardContent user={user} stats={stats} items={items} borrows={borrows} movements={movements} purchaseRequests={purchaseRequests} navigate={navigate} theme={theme} />;
+    return (
+      <AdminDashboardContent 
+        user={user} 
+        stats={stats} 
+        items={items} 
+        borrows={borrows} 
+        movements={movements} 
+        purchaseRequests={purchaseRequests} 
+        navigate={navigate} 
+        theme={theme}
+        adminTimeRange={adminTimeRange}
+        setAdminTimeRange={setAdminTimeRange}
+      />
+    );
   } else if (user.role === 'supply_officer') {
     return <SupplyOfficerDashboardContent 
       user={user} 
@@ -178,7 +194,7 @@ export default function Dashboard() {
 }
 
 // Admin Dashboard Component
-function AdminDashboardContent({ user, stats, items, borrows, movements, purchaseRequests, navigate, theme }) {
+function AdminDashboardContent({ user, stats, items, borrows, movements, purchaseRequests, navigate, theme, adminTimeRange, setAdminTimeRange }) {
   const quickStats = stats ? [
     {
       title: 'Total Users',
@@ -286,57 +302,25 @@ function AdminDashboardContent({ user, stats, items, borrows, movements, purchas
           ))}
         </Grid>
 
-        {/* Quick Actions */}
-        <Card sx={{ mb: 4, borderRadius: 3 }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-              <Typography variant="h5" fontWeight="700" color="#006400">
-                Quick Actions
-              </Typography>
-              <Chip icon={<ScheduleIcon />} label="Most Used" size="small" sx={{ background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)', color: 'white' }} />
-            </Box>
-            <Grid container spacing={2}>
-              {quickActions.map((action, index) => (
-                <Grid item xs={6} md={4} key={index}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    onClick={() => navigate(action.path)}
-                    sx={{
-                      minHeight: '140px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      p: 3,
-                      border: '2px solid',
-                      borderColor: 'grey.200',
-                      borderRadius: 2,
-                      color: '#006400',
-                      '&:hover': {
-                        borderColor: '#006400',
-                        background: 'linear-gradient(135deg, #f8fff8 0%, #f0f8f0 100%)',
-                        transform: 'translateY(-4px)',
-                      }
-                    }}
-                  >
-                    <Box sx={{ fontSize: '2rem', mb: 1.5, color: action.color }}>
-                      {action.icon}
-                    </Box>
-                    <Typography variant="subtitle2" fontWeight="600">
-                      {action.label}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'grey.600' }}>
-                      {action.description}
-                    </Typography>
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
+        {/* Analytics Filters + Charts */}
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          {/* Time range filter: Daily / Monthly / Yearly */}
+          <TextField
+            select
+            size="small"
+            label="Time Range"
+            value={adminTimeRange}
+            onChange={(e) => setAdminTimeRange(e.target.value)}
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value="Daily">Daily</MenuItem>
+            <MenuItem value="Monthly">Monthly</MenuItem>
+            <MenuItem value="Yearly">Yearly</MenuItem>
+          </TextField>
+        </Box>
 
         {/* Charts */}
-        <DashboardCharts purchaseRequests={purchaseRequests} borrows={borrows} items={items} />
+        <DashboardCharts purchaseRequests={purchaseRequests} borrows={borrows} items={items} timeRange={adminTimeRange} />
       </Box>
     </DashboardLayout>
   );
@@ -477,7 +461,7 @@ function StaffDashboardContent({ user, items, borrows, navigate, theme }) {
                 <Typography variant="h3" fontWeight="700" color="primary.main">
                   {items.filter(i => i.status === 'Available').length}
                 </Typography>
-                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/items')}>
+                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/available-items')}>
                   Browse Items
                 </Button>
               </CardContent>
@@ -496,8 +480,8 @@ function StaffDashboardContent({ user, items, borrows, navigate, theme }) {
                 <Typography variant="h3" fontWeight="700" color="warning.main">
                   {myBorrows.filter(b => b.status === 'Approved').length}
                 </Typography>
-                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/borrow-requests')}>
-                  View My Requests
+                <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/borrows')}>
+                  View My Borrows
                 </Button>
               </CardContent>
             </Card>
@@ -515,7 +499,7 @@ function StaffDashboardContent({ user, items, borrows, navigate, theme }) {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   Need equipment? Submit a request or borrow an item.
                 </Typography>
-                <Button variant="contained" sx={{ mt: 1 }} onClick={() => navigate('/borrow-requests')}>
+                <Button variant="contained" sx={{ mt: 1 }} onClick={() => navigate('/request-item')}>
                   Create Request
                 </Button>
               </CardContent>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Grid, Card, CardContent, useTheme, alpha } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, useTheme, alpha, Stack, Chip } from '@mui/material';
 import { Bar, Pie, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -28,12 +28,38 @@ ChartJS.register(
   Filler
 );
 
-export function DashboardCharts({ purchaseRequests, borrows, items }) {
+export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 'Daily' }) {
   const theme = useTheme();
+
+  // Helper: filter by time range based on created_at date
+  const filterByRange = (list) => {
+    const now = new Date();
+    const cutoff = new Date(now);
+    if (timeRange === 'Daily') cutoff.setDate(now.getDate() - 1);
+    else if (timeRange === 'Monthly') cutoff.setMonth(now.getMonth() - 1);
+    else if (timeRange === 'Yearly') cutoff.setFullYear(now.getFullYear() - 1);
+
+    return list.filter(item => {
+      const created = item.created_at ? new Date(item.created_at) : null;
+      return created && created >= cutoff && created <= now;
+    });
+  };
+
+  const prFiltered = filterByRange(purchaseRequests);
+  const brFiltered = filterByRange(borrows);
+
+  // Calculate stats for summary cards
+  const totalRequests = prFiltered.length + brFiltered.length;
+  const approvedRequests = 
+    prFiltered.filter(pr => pr.status === 'Approved').length +
+    brFiltered.filter(br => br.status === 'Approved').length;
+  const pendingRequests = 
+    prFiltered.filter(pr => pr.status === 'Pending').length +
+    brFiltered.filter(br => br.status === 'Pending').length;
 
   // Purchase Requests by Status
   const prStatusCounts = ['Pending', 'Approved', 'Rejected'].map(status =>
-    purchaseRequests.filter(pr => pr.status === status).length
+    prFiltered.filter(pr => pr.status === status).length
   );
   const prStatusData = {
     labels: ['Pending', 'Approved', 'Rejected'],
@@ -41,23 +67,25 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
       label: 'Purchase Requests',
       data: prStatusCounts,
       backgroundColor: [
-        alpha(theme.palette.warning.main, 0.8),
-        alpha(theme.palette.success.main, 0.8),
-        alpha(theme.palette.error.main, 0.8)
+        alpha(theme.palette.warning.main, 0.7),
+        alpha(theme.palette.success.main, 0.7),
+        alpha(theme.palette.error.main, 0.7)
       ],
       borderColor: [
-        theme.palette.warning.main,
-        theme.palette.success.main,
-        theme.palette.error.main
+        theme.palette.warning.dark,
+        theme.palette.success.dark,
+        theme.palette.error.dark
       ],
-      borderWidth: 2,
+      borderWidth: 1,
       borderRadius: 8,
+      barPercentage: 0.6,
+      categoryPercentage: 0.7,
     }],
   };
 
   // Borrow Requests by Status
   const brStatusCounts = ['Pending', 'Approved', 'Rejected', 'Returned'].map(status =>
-    borrows.filter(br => br.status === status).length
+    brFiltered.filter(br => br.status === status).length
   );
   const brStatusData = {
     labels: ['Pending', 'Approved', 'Rejected', 'Returned'],
@@ -65,26 +93,29 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
       label: 'Borrow Requests',
       data: brStatusCounts,
       backgroundColor: [
-        alpha(theme.palette.info.main, 0.8),
-        alpha(theme.palette.success.main, 0.8),
-        alpha(theme.palette.error.main, 0.8),
-        alpha(theme.palette.grey[600], 0.8)
+        alpha(theme.palette.warning.main, 0.7),
+        alpha(theme.palette.success.main, 0.7),
+        alpha(theme.palette.error.main, 0.7),
+        alpha(theme.palette.info.main, 0.7)
       ],
       borderColor: [
-        theme.palette.info.main,
-        theme.palette.success.main,
-        theme.palette.error.main,
-        theme.palette.grey[600]
+        theme.palette.warning.dark,
+        theme.palette.success.dark,
+        theme.palette.error.dark,
+        theme.palette.info.dark
       ],
-      borderWidth: 2,
+      borderWidth: 1,
       borderRadius: 8,
+      barPercentage: 0.6,
+      categoryPercentage: 0.7,
     }],
   };
 
-  // Inventory Stock Levels - Doughnut Chart
+  // Inventory Stock Levels - Pie Chart (better for percentages)
   const lowStock = items.filter(it => it.stock <= (it.low_stock_threshold || 10) && it.stock > 0).length;
   const outStock = items.filter(it => it.stock === 0).length;
   const normalStock = items.length - lowStock - outStock;
+  
   const inventoryPieData = {
     labels: ['Normal Stock', 'Low Stock', 'Out of Stock'],
     datasets: [{
@@ -95,11 +126,13 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
         alpha(theme.palette.error.main, 0.8)
       ],
       borderColor: [
-        theme.palette.success.main,
-        theme.palette.warning.main,
-        theme.palette.error.main
+        theme.palette.success.dark,
+        theme.palette.warning.dark,
+        theme.palette.error.dark
       ],
       borderWidth: 2,
+      hoverOffset: 15,
+      cutout: '70%',
     }],
   };
 
@@ -110,12 +143,12 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
     
-    const prCount = purchaseRequests.filter(pr => {
+    const prCount = prFiltered.filter(pr => {
       const prDate = pr.created_at?.split('T')[0];
       return prDate === dateStr;
     }).length;
 
-    const brCount = borrows.filter(br => {
+    const brCount = brFiltered.filter(br => {
       const brDate = br.created_at?.split('T')[0];
       return brDate === dateStr;
     }).length;
@@ -134,29 +167,29 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
         label: 'Purchase Requests',
         data: last7Days.map(d => d.prCount),
         fill: true,
-        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+        backgroundColor: alpha(theme.palette.primary.main, 0.08),
         borderColor: theme.palette.primary.main,
         borderWidth: 3,
-        tension: 0.4,
+        tension: 0.3,
         pointBackgroundColor: theme.palette.primary.main,
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 7,
+        pointRadius: 6,
+        pointHoverRadius: 8,
       },
       {
         label: 'Borrow Requests',
         data: last7Days.map(d => d.brCount),
         fill: true,
-        backgroundColor: alpha(theme.palette.info.main, 0.1),
-        borderColor: theme.palette.info.main,
+        backgroundColor: alpha(theme.palette.secondary.main, 0.08),
+        borderColor: theme.palette.secondary.main,
         borderWidth: 3,
-        tension: 0.4,
-        pointBackgroundColor: theme.palette.info.main,
+        tension: 0.3,
+        pointBackgroundColor: theme.palette.secondary.main,
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 7,
+        pointRadius: 6,
+        pointHoverRadius: 8,
       }
     ],
   };
@@ -168,26 +201,41 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
       legend: {
         position: 'bottom',
         labels: {
-          padding: 15,
+          padding: 20,
           font: {
             size: 12,
-            weight: '600',
+            family: theme.typography.fontFamily,
+            weight: '500',
           },
           usePointStyle: true,
           pointStyle: 'circle',
+          color: theme.palette.text.secondary,
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: alpha(theme.palette.background.paper, 0.95),
+        titleColor: theme.palette.text.primary,
+        bodyColor: theme.palette.text.secondary,
         padding: 12,
         borderRadius: 8,
+        borderColor: theme.palette.divider,
+        borderWidth: 1,
         titleFont: {
-          size: 14,
-          weight: 'bold',
+          size: 13,
+          weight: '600',
+          family: theme.typography.fontFamily,
         },
         bodyFont: {
-          size: 13,
+          size: 12,
+          family: theme.typography.fontFamily,
         },
+        boxPadding: 6,
+        displayColors: true,
+        callbacks: {
+          label: (context) => {
+            return `${context.dataset.label}: ${context.raw}`;
+          }
+        }
       },
     },
     scales: {
@@ -197,21 +245,42 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
           stepSize: 1,
           font: {
             size: 11,
+            family: theme.typography.fontFamily,
           },
+          color: theme.palette.text.secondary,
         },
         grid: {
-          color: alpha(theme.palette.divider, 0.5),
+          color: alpha(theme.palette.divider, 0.3),
+          drawBorder: false,
+        },
+        border: {
+          display: false,
         },
       },
       x: {
         ticks: {
           font: {
             size: 11,
+            family: theme.typography.fontFamily,
           },
+          color: theme.palette.text.secondary,
         },
         grid: {
           display: false,
         },
+        border: {
+          display: false,
+        },
+      },
+    },
+  };
+
+  const barChartOptions = {
+    ...chartOptions,
+    plugins: {
+      ...chartOptions.plugins,
+      legend: {
+        display: false,
       },
     },
   };
@@ -222,27 +291,214 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
       mode: 'index',
       intersect: false,
     },
+    plugins: {
+      ...chartOptions.plugins,
+      legend: {
+        position: 'top',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12,
+            family: theme.typography.fontFamily,
+            weight: '500',
+          },
+          usePointStyle: true,
+          pointStyle: 'circle',
+          color: theme.palette.text.secondary,
+        },
+      },
+    },
+    scales: {
+      ...chartOptions.scales,
+      y: {
+        ...chartOptions.scales.y,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          callback: (value) => Math.floor(value) === value ? value : '',
+        },
+      },
+    },
+  };
+
+  const doughnutOptions = {
+    ...chartOptions,
+    plugins: {
+      ...chartOptions.plugins,
+      legend: {
+        position: 'right',
+        labels: {
+          padding: 20,
+          font: {
+            size: 12,
+            family: theme.typography.fontFamily,
+            weight: '500',
+          },
+          usePointStyle: true,
+          pointStyle: 'circle',
+          color: theme.palette.text.secondary,
+          generateLabels: (chart) => {
+            const data = chart.data;
+            if (data.labels.length && data.datasets.length) {
+              return data.labels.map((label, i) => {
+                const value = data.datasets[0].data[i];
+                const percentage = ((value / items.length) * 100).toFixed(1);
+                return {
+                  text: `${label}: ${value} (${percentage}%)`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  strokeStyle: data.datasets[0].borderColor[i],
+                  lineWidth: 1,
+                  hidden: false,
+                  index: i,
+                };
+              });
+            }
+            return [];
+          },
+        },
+      },
+      tooltip: {
+        ...chartOptions.plugins.tooltip,
+        callbacks: {
+          label: (context) => {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            const percentage = ((value / items.length) * 100).toFixed(1);
+            return `${label}: ${value} (${percentage}%)`;
+          }
+        }
+      },
+    },
+    cutout: '65%',
   };
 
   return (
-    <Box sx={{ mb: 4 }}>
-      <Typography variant="h5" fontWeight="700" gutterBottom sx={{ mb: 3 }}>
-        📊 Analytics Overview
-      </Typography>
+    <Box sx={{ mb: 6 }}>
+      {/* Header with Stats Summary */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={700} sx={{ color: theme.palette.primary.main, mb: 0.5 }}>
+              Analytics Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Real-time insights and trends for your inventory management
+            </Typography>
+          </Box>
+          <Chip 
+            label={`${timeRange} View`} 
+            color="primary" 
+            variant="outlined"
+            sx={{ fontWeight: 600 }}
+          />
+        </Box>
+
+        {/* Summary Cards */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+              boxShadow: 'none',
+            }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight={800} color="primary.main" sx={{ mb: 1 }}>
+                  {totalRequests}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total Requests
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  {timeRange} period
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              bgcolor: alpha(theme.palette.success.main, 0.08),
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+              boxShadow: 'none',
+            }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight={800} color="success.main" sx={{ mb: 1 }}>
+                  {approvedRequests}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Approved Requests
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  {totalRequests > 0 ? `${Math.round((approvedRequests / totalRequests) * 100)}% approval rate` : 'No data'}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              bgcolor: alpha(theme.palette.warning.main, 0.08),
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+              boxShadow: 'none',
+            }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight={800} color="warning.main" sx={{ mb: 1 }}>
+                  {pendingRequests}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Pending Requests
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Requires attention
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              bgcolor: alpha(theme.palette.info.main, 0.08),
+              borderRadius: 3,
+              border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+              boxShadow: 'none',
+            }}>
+              <CardContent>
+                <Typography variant="h3" fontWeight={800} color="info.main" sx={{ mb: 1 }}>
+                  {items.length}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total Items
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  In inventory
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Charts Grid */}
       <Grid container spacing={3}>
         {/* Request Trend - Line Chart */}
         <Grid item xs={12} lg={8}>
-          <Card 
-            sx={{ 
-              height: 400,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              borderRadius: 3,
-            }}
-          >
-            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Request Trend (Last 7 Days)
-              </Typography>
+          <Card sx={{ 
+            height: 420,
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            '&:hover': {
+              boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
+            }
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Request Trend (Last 7 Days)
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Daily comparison of purchase and borrow requests
+                </Typography>
+              </Box>
               <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
                 <Line data={requestTrendData} options={lineChartOptions} />
               </Box>
@@ -252,19 +508,33 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
 
         {/* Inventory Stock Levels - Doughnut */}
         <Grid item xs={12} lg={4}>
-          <Card 
-            sx={{ 
-              height: 400,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              borderRadius: 3,
-            }}
-          >
-            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Inventory Stock Status
-              </Typography>
-              <Box sx={{ flex: 1, position: 'relative', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Doughnut data={inventoryPieData} options={chartOptions} />
+          <Card sx={{ 
+            height: 420,
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            '&:hover': {
+              boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
+            }
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Inventory Stock Status
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Overview of item availability
+                </Typography>
+              </Box>
+              <Box sx={{ 
+                flex: 1, 
+                position: 'relative', 
+                minHeight: 0, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <Doughnut data={inventoryPieData} options={doughnutOptions} />
               </Box>
             </CardContent>
           </Card>
@@ -272,19 +542,26 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
 
         {/* Purchase Requests Status - Bar */}
         <Grid item xs={12} md={6}>
-          <Card 
-            sx={{ 
-              height: 350,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              borderRadius: 3,
-            }}
-          >
-            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Purchase Requests by Status
-              </Typography>
+          <Card sx={{ 
+            height: 380,
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            '&:hover': {
+              boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
+            }
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Purchase Requests by Status
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Distribution of purchase request statuses
+                </Typography>
+              </Box>
               <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
-                <Bar data={prStatusData} options={chartOptions} />
+                <Bar data={prStatusData} options={barChartOptions} />
               </Box>
             </CardContent>
           </Card>
@@ -292,19 +569,26 @@ export function DashboardCharts({ purchaseRequests, borrows, items }) {
 
         {/* Borrow Requests Status - Bar */}
         <Grid item xs={12} md={6}>
-          <Card 
-            sx={{ 
-              height: 350,
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              borderRadius: 3,
-            }}
-          >
-            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="600" gutterBottom>
-                Borrow Requests by Status
-              </Typography>
+          <Card sx={{ 
+            height: 380,
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            '&:hover': {
+              boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
+            }
+          }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Borrow Requests by Status
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Distribution of borrow request statuses
+                </Typography>
+              </Box>
               <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
-                <Bar data={brStatusData} options={chartOptions} />
+                <Bar data={brStatusData} options={barChartOptions} />
               </Box>
             </CardContent>
           </Card>

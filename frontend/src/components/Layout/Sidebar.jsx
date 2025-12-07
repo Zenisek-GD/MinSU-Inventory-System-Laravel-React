@@ -50,14 +50,13 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         ...baseItems,
         { path: '/offices', icon: <OfficeIcon />, label: 'Manage Offices', roles: ['admin'] },
         { path: '/users', icon: <UsersIcon />, label: 'Manage Users', roles: ['admin'] },
-        { path: '/items', icon: <ItemsIcon />, label: 'Manage Items', roles: ['admin'] },
+        { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['admin'] },
         { path: '/categories', icon: <CategoryIcon />, label: 'Categories', roles: ['admin'] },
         { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['admin'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
-        { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['admin'] },
+        // merged: inventory removed
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['admin'] },
-        { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['admin'] },
-        { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['admin'] },
+        // Reports and QR Scanner removed from sidebar (QR via navbar)
       ];
     }
 
@@ -66,10 +65,9 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         ...baseItems,
         { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['supply_officer'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
-        { path: '/inventory', icon: <InventoryIcon />, label: 'Inventory', roles: ['supply_officer'] },
-        { path: '/items', icon: <ItemsIcon />, label: 'Item Catalog', roles: ['supply_officer'] },
+        { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['supply_officer'] },
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['supply_officer'] },
-        { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['supply_officer'] },
+        // QR Scanner removed from sidebar (available in navbar)
       ];
     }
 
@@ -77,10 +75,9 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
       return [
         ...baseItems,
         { path: '/request-item', icon: <AddIcon />, label: 'Request Item', roles: ['staff'] },
-        { path: '/borrow-item', icon: <BorrowIcon />, label: 'Borrow Item', roles: ['staff'] },
-        { path: '/current-borrows', icon: <HistoryIcon />, label: 'My Borrows', roles: ['staff'] },
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrows', roles: ['staff'] },
         { path: '/available-items', icon: <CartIcon />, label: 'Available Items', roles: ['staff'] },
-        { path: '/qr-scanner', icon: <QRIcon />, label: 'QR Scanner', roles: ['staff'] },
+        // QR Scanner removed from sidebar (available in navbar)
       ];
     }
 

@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { fetchUsers, createUser, updateUser, deleteUser } from "../api/user";
 import DashboardLayout from "../components/Layout/DashboardLayout";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  MenuItem,
+  Typography,
+  Box,
+  IconButton,
+  Alert,
+} from "@mui/material";
+import { Close, PersonAdd } from "@mui/icons-material";
 
 const roles = [
   { value: "admin", label: "Admin" },
@@ -94,98 +108,131 @@ const UsersPage = () => {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">User Management</h1>
             <p className="text-gray-600">Manage system users and their permissions</p>
           </div>
-          <button
+          <Button
             onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center space-x-2"
+            variant="contained"
+            startIcon={<PersonAdd />}
+            sx={{
+              bgcolor: '#006400',
+              '&:hover': { bgcolor: '#004d00' },
+              borderRadius: 2,
+              px: 3,
+              py: 1.5,
+            }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Add User</span>
-          </button>
+            Add User
+          </Button>
         </div>
 
         {/* Add User Modal */}
-        {isAddModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-800">Add New User</h2>
-                <button
-                  onClick={closeAddModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+        <Dialog
+          open={isAddModalOpen}
+          onClose={closeAddModal}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3 }
+          }}
+        >
+          <DialogTitle sx={{ pb: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="h5" sx={{ fontWeight: 600, color: '#006400' }}>
+                Add New User
+              </Typography>
+              <IconButton
+                onClick={closeAddModal}
+                size="small"
+                sx={{ color: 'text.secondary' }}
+              >
+                <Close />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          
+          <form onSubmit={handleCreate}>
+            <DialogContent sx={{ pt: 3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <TextField
+                  fullWidth
+                  label="Full Name"
+                  value={newUser.name}
+                  onChange={e => setNewUser({ ...newUser, name: e.target.value })}
+                  placeholder="Enter full name"
+                  required
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '&:hover fieldset': {
+                        borderColor: '#006400',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#006400',
+                      },
+                    },
+                  }}
+                />
+                
+                <TextField
+                  fullWidth
+                  label="Email Address"
+                  value={newUser.email}
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                  placeholder="email@example.com"
+                  type="email"
+                  required
+                  variant="outlined"
+                />
+                
+                <TextField
+                  fullWidth
+                  label="Password"
+                  value={newUser.password}
+                  onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="Enter password"
+                  type="password"
+                  required
+                  variant="outlined"
+                />
+                
+                <TextField
+                  fullWidth
+                  select
+                  label="Role"
+                  value={newUser.role}
+                  onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                  variant="outlined"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <form onSubmit={handleCreate} className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                    <input
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      value={newUser.name}
-                      onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-                      placeholder="Full name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      value={newUser.email}
-                      onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                      placeholder="email@example.com"
-                      type="email"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      value={newUser.password}
-                      onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                      placeholder="••••••••"
-                      type="password"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      value={newUser.role}
-                      onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-                    >
-                      {roles.map(r => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={closeAddModal}
-                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  >
-                    Create User
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+                  {roles.map(r => (
+                    <MenuItem key={r.value} value={r.value}>
+                      {r.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+            </DialogContent>
+            
+            <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
+              <Button
+                onClick={closeAddModal}
+                variant="outlined"
+                sx={{ borderRadius: 2 }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                sx={{
+                  borderRadius: 2,
+                  bgcolor: '#006400',
+                  '&:hover': { bgcolor: '#004d00' }
+                }}
+              >
+                Create User
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
 
         {/* Users List */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
