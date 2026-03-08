@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { fetchUsers, createUser, updateUser, deleteUser } from "../api/user";
+import { listOffices } from "../api/offices";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import {
   Dialog,
@@ -13,8 +14,9 @@ import {
   Box,
   IconButton,
   Alert,
+  Chip,
 } from "@mui/material";
-import { Close, PersonAdd } from "@mui/icons-material";
+import { Close, PersonAdd, Business } from "@mui/icons-material";
 
 const roles = [
   { value: "admin", label: "Admin" },
@@ -24,16 +26,28 @@ const roles = [
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
+  const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "staff" });
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "staff", office_id: "" });
   const [editing, setEditing] = useState(null);
-  const [editUser, setEditUser] = useState({ name: "", email: "", role: "staff", is_active: true });
+  const [editUser, setEditUser] = useState({ name: "", email: "", role: "staff", is_active: true, office_id: null });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     loadUsers();
+    loadOffices();
   }, []);
+
+  const loadOffices = async () => {
+    try {
+      const data = await listOffices();
+      setOffices(data || []);
+    } catch (err) {
+      console.error('Failed to load offices:', err);
+      setOffices([]);
+    }
+  };
 
   const loadUsers = async () => {
     console.log('loadUsers called');
@@ -51,9 +65,13 @@ const UsersPage = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      const created = await createUser(newUser);
+      const dataToSend = {
+        ...newUser,
+        office_id: newUser.office_id === "" ? null : newUser.office_id
+      };
+      const created = await createUser(dataToSend);
       setUsers(prev => [...prev, created?.data?.data || created?.data || created || {}]);
-      setNewUser({ name: "", email: "", password: "", role: "staff" });
+      setNewUser({ name: "", email: "", password: "", role: "staff", office_id: "" });
       setIsAddModalOpen(false);
     } catch {
       setError("Failed to create user");
@@ -67,15 +85,20 @@ const UsersPage = () => {
       email: user.email,
       role: user.role,
       is_active: user.is_active,
+      office_id: user.office_id || "",
     });
   };
 
   const handleUpdate = async (id) => {
     try {
-      await updateUser(id, editUser);
+      const dataToSend = {
+        ...editUser,
+        office_id: editUser.office_id === "" ? null : editUser.office_id
+      };
+      await updateUser(id, dataToSend);
       await loadUsers();
       setEditing(null);
-      setEditUser({ name: "", email: "", role: "staff", is_active: true });
+      setEditUser({ name: "", email: "", role: "staff", is_active: true, office_id: null });
     } catch {
       setError("Failed to update user");
     }
@@ -97,7 +120,7 @@ const UsersPage = () => {
 
   const closeAddModal = () => {
     setIsAddModalOpen(false);
-    setNewUser({ name: "", email: "", password: "", role: "staff" });
+    setNewUser({ name: "", email: "", password: "", role: "staff", office_id: "" });
   };
 
   return (
@@ -148,7 +171,7 @@ const UsersPage = () => {
               </IconButton>
             </Box>
           </DialogTitle>
-          
+
           <form onSubmit={handleCreate}>
             <DialogContent sx={{ pt: 3 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
@@ -171,7 +194,7 @@ const UsersPage = () => {
                     },
                   }}
                 />
-                
+
                 <TextField
                   fullWidth
                   label="Email Address"
@@ -182,7 +205,7 @@ const UsersPage = () => {
                   required
                   variant="outlined"
                 />
-                
+
                 <TextField
                   fullWidth
                   label="Password"
@@ -193,7 +216,7 @@ const UsersPage = () => {
                   required
                   variant="outlined"
                 />
-                
+
                 <TextField
                   fullWidth
                   select
@@ -208,9 +231,26 @@ const UsersPage = () => {
                     </MenuItem>
                   ))}
                 </TextField>
+
+                <TextField
+                  fullWidth
+                  select
+                  label="Room (Optional)"
+                  value={newUser.office_id}
+                  onChange={e => setNewUser({ ...newUser, office_id: e.target.value })}
+                  variant="outlined"
+                  helperText="Assign this user to a room or department location"
+                >
+                  <MenuItem value="">None - No specific room</MenuItem>
+                  {offices.map(office => (
+                    <MenuItem key={office.id} value={office.id}>
+                      {office.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Box>
             </DialogContent>
-            
+
             <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
               <Button
                 onClick={closeAddModal}
@@ -239,7 +279,7 @@ const UsersPage = () => {
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-800">Users List</h2>
           </div>
-          
+
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -296,6 +336,19 @@ const UsersPage = () => {
                           ))}
                         </select>
                       </div>
+                      <div className="lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                        <select
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          value={editUser.office_id}
+                          onChange={e => setEditUser({ ...editUser, office_id: e.target.value })}
+                        >
+                          <option value="">None</option>
+                          {offices.map(office => (
+                            <option key={office.id} value={office.id}>{office.name}</option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="lg:col-span-2 flex items-center">
                         <label className="flex items-center space-x-2">
                           <input
@@ -307,14 +360,14 @@ const UsersPage = () => {
                           <span className="text-sm font-medium text-gray-700">Active</span>
                         </label>
                       </div>
-                      <div className="lg:col-span-2 flex space-x-2">
-                        <button 
+                      <div className="lg:col-span-12 flex space-x-2">
+                        <button
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200 text-sm"
                           onClick={() => handleUpdate(user.id)}
                         >
                           Save
                         </button>
-                        <button 
+                        <button
                           className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200 text-sm"
                           onClick={() => setEditing(null)}
                         >
@@ -337,28 +390,40 @@ const UsersPage = () => {
                           </div>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            user.role === 'supply_officer' ? 'bg-green-100 text-green-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                              user.role === 'supply_officer' ? 'bg-green-100 text-green-800' :
+                                'bg-blue-100 text-blue-800'
+                            }`}>
                             {roles.find(r => r.value === user.role)?.label}
                           </span>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
+                          {user.office && (
+                            <Chip
+                              icon={<Business />}
+                              label={user.office?.name || 'No room assigned'}
+                              size="small"
+                              variant="outlined"
+                              sx={{ borderColor: '#006400', color: '#006400' }}
+                            />
+                          )}
+                          {!user.office && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              No room assigned
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="mt-4 lg:mt-0 flex space-x-2">
-                        <button 
+                        <button
                           className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm border border-blue-200"
                           onClick={() => handleEdit(user)}
                         >
                           Edit
                         </button>
-                        <button 
+                        <button
                           className="bg-red-50 hover:bg-red-100 text-red-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm border border-red-200"
                           onClick={() => handleDelete(user.id)}
                         >

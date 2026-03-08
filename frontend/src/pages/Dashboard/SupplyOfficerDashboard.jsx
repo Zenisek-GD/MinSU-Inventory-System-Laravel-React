@@ -31,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { fetchDashboardStats } from '../../api/dashboard';
-import { fetchPurchaseRequests } from '../../api/purchaseRequest';
+import { fetchMemorandumReceipts } from '../../api/memorandumReceipt';
 import { fetchBorrows } from '../../api/borrow';
 import { fetchItems } from '../../api/item';
 import { fetchStockMovements } from '../../api/stockMovement';
@@ -39,19 +39,19 @@ import { DashboardCharts } from '../../components/Dashboard/DashboardCharts';
 
 const SupplyOfficerDashboard = () => {
   const theme = useTheme();
-  
+
   // Monitoring filters
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterOffice, setFilterOffice] = useState('All');
   const [filterItem, setFilterItem] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
-  
+
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({ users: [], offices: [], items: [], purchaseRequests: [] });
-  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [stats, setStats] = useState({ users: [], offices: [], items: [], memorandumReceipts: [] });
+  const [memorandumReceipts, setMemorandumReceipts] = useState([]);
   const [borrows, setBorrows] = useState([]);
   const [items, setItems] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -67,15 +67,15 @@ const SupplyOfficerDashboard = () => {
           setStats(dashboardStats);
         } catch (err) {
           console.error('[SupplyOfficerDashboard] Failed to fetch dashboard stats:', err);
-          setStats({ users: [], offices: [], items: [], purchaseRequests: [] });
+          setStats({ users: [], offices: [], items: [], memorandumReceipts: [] });
         }
 
         try {
-          const pr = await fetchPurchaseRequests();
-          setPurchaseRequests(pr || []);
+          const pr = await fetchMemorandumReceipts();
+          setMemorandumReceipts(Array.isArray(pr) ? pr : []);
         } catch (err) {
-          console.error('[SupplyOfficerDashboard] Failed to fetch purchase requests:', err);
-          setPurchaseRequests([]);
+          console.error('[SupplyOfficerDashboard] Failed to fetch memorandum receipts:', err);
+          setMemorandumReceipts([]);
         }
 
         try {
@@ -130,10 +130,10 @@ const SupplyOfficerDashboard = () => {
   });
 
   // Advanced filters for requests
-  const filteredPurchaseRequests = purchaseRequests.filter(pr =>
-    (filterStatus === 'All' || pr.status === filterStatus) &&
-    (filterOffice === 'All' || pr.office?.name === filterOffice) &&
-    (filterItem === '' || pr.items?.some(i => i.item_name?.toLowerCase().includes(filterItem.toLowerCase())))
+  const filteredMemorandumReceipts = memorandumReceipts.filter(mr =>
+    (filterStatus === 'All' || mr.status === filterStatus) &&
+    (filterOffice === 'All' || mr.office?.name === filterOffice) &&
+    (filterItem === '' || mr.items?.some(i => i.item_name?.toLowerCase().includes(filterItem.toLowerCase())))
   );
   const filteredBorrows = borrows.filter(br =>
     (filterStatus === 'All' || br.status === filterStatus) &&
@@ -143,12 +143,12 @@ const SupplyOfficerDashboard = () => {
   // Priority Tasks
   const priorityTasks = [
     {
-      title: 'Pending Purchase Requests',
-      count: purchaseRequests.filter(pr => pr.status === 'Pending').length,
+      title: 'Pending Memorandum Receipts',
+      count: memorandumReceipts.filter(mr => mr.status === 'Issued').length,
       icon: <PRIcon />,
       color: 'warning',
-      path: '/purchase-requests',
-      items: purchaseRequests.filter(pr => pr.status === 'Pending').slice(0, 3).map(pr => `${pr.items?.[0]?.item_name || 'Item'} (${pr.items?.[0]?.quantity || 1})`)
+      path: '/memorandum-receipts',
+      items: memorandumReceipts.filter(mr => mr.status === 'Issued').slice(0, 3).map(mr => `${mr.items?.[0]?.item_name || 'Item'} (${mr.items?.[0]?.quantity || 1})`)
     },
     {
       title: 'Borrow Requests',
@@ -167,23 +167,23 @@ const SupplyOfficerDashboard = () => {
       items: items.filter(it => it.stock <= (it.low_stock_threshold || 10)).slice(0, 3).map(it => it.name)
     },
     {
-      title: 'Pending Deliveries',
-      count: purchaseRequests.filter(pr => pr.status === 'Approved' && !pr.delivered_at).length,
+      title: 'Active Equipment',
+      count: memorandumReceipts.filter(mr => mr.status === 'Active' && !mr.return_requested_at).length,
       icon: <DeliveryIcon />,
       color: 'success',
       path: '/inventory',
-      items: purchaseRequests.filter(pr => pr.status === 'Approved' && !pr.delivered_at).slice(0, 3).map(pr => pr.items?.[0]?.item_name || 'Item')
+      items: memorandumReceipts.filter(mr => mr.status === 'Active' && !mr.return_requested_at).slice(0, 3).map(mr => mr.items?.[0]?.item_name || 'Item')
     },
   ];
 
-  // Recent Requests (mix of PR and Borrow)
+  // Recent Requests (mix of MR and Borrow)
   const recentRequests = [
-    ...purchaseRequests.slice(0, 2).map(pr => ({
-      id: pr.id,
-      item: pr.items?.[0]?.item_name || 'Item',
-      requester: pr.requestedBy?.name || 'Unknown',
-      date: pr.created_at,
-      status: pr.status.toLowerCase()
+    ...memorandumReceipts.slice(0, 2).map(mr => ({
+      id: mr.id,
+      item: mr.items?.[0]?.item_name || 'Item',
+      requester: mr.requestedBy?.name || 'Unknown',
+      date: mr.created_at,
+      status: mr.status.toLowerCase()
     })),
     ...borrows.slice(0, 2).map(br => ({
       id: br.id,
@@ -219,20 +219,20 @@ const SupplyOfficerDashboard = () => {
                 Inventory management and request processing
               </Typography>
             </Box>
-            <Chip 
-              icon={<TrendingUp />} 
-              label="Live Monitoring" 
-              color="primary" 
+            <Chip
+              icon={<TrendingUp />}
+              label="Live Monitoring"
+              color="primary"
               variant="outlined"
               sx={{ fontWeight: 600 }}
             />
           </Box>
-          
+
           {/* Filters Section */}
-          <Paper 
+          <Paper
             elevation={0}
-            sx={{ 
-              p: 3, 
+            sx={{
+              p: 3,
               bgcolor: alpha(theme.palette.primary.main, 0.02),
               border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
               borderRadius: 3
@@ -261,7 +261,7 @@ const SupplyOfficerDashboard = () => {
                 sx={{ minWidth: 140 }}
               >
                 <MenuItem value="All">All Offices</MenuItem>
-                {[...new Set(purchaseRequests.map(pr => pr.office?.name).filter(Boolean))].map(name => (
+                {[...new Set(memorandumReceipts.map(mr => mr.office?.name).filter(Boolean))].map(name => (
                   <MenuItem key={name} value={name}>{name}</MenuItem>
                 ))}
               </TextField>
@@ -302,7 +302,7 @@ const SupplyOfficerDashboard = () => {
 
         {/* Monitoring Charts */}
         <Box sx={{ mb: 4 }}>
-          <DashboardCharts purchaseRequests={purchaseRequests} borrows={borrows} items={items} />
+          <DashboardCharts memorandumReceipts={memorandumReceipts} borrows={borrows} items={items} />
         </Box>
 
         {loading ? (
@@ -319,15 +319,15 @@ const SupplyOfficerDashboard = () => {
             <Grid container spacing={3} sx={{ mb: 4 }}>
               {priorityTasks.map((task, index) => (
                 <Grid item xs={12} sm={6} md={3} key={index}>
-                  <Card 
-                    sx={{ 
+                  <Card
+                    sx={{
                       height: '100%',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease-in-out',
                       background: `linear-gradient(135deg, ${alpha(theme.palette[task.color].main, 0.05)} 0%, ${alpha(theme.palette[task.color].main, 0.02)} 100%)`,
                       border: `1px solid ${alpha(theme.palette[task.color].main, 0.1)}`,
                       borderRadius: 3,
-                      '&:hover': { 
+                      '&:hover': {
                         transform: 'translateY(-8px)',
                         boxShadow: 4,
                         borderColor: alpha(theme.palette[task.color].main, 0.3),
@@ -337,8 +337,8 @@ const SupplyOfficerDashboard = () => {
                   >
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                        <Box 
-                          sx={{ 
+                        <Box
+                          sx={{
                             color: `${task.color}.main`,
                             fontSize: 48,
                             opacity: 0.8
@@ -346,10 +346,10 @@ const SupplyOfficerDashboard = () => {
                         >
                           {task.icon}
                         </Box>
-                        <Chip 
-                          label={task.count} 
-                          color={task.color} 
-                          size="medium" 
+                        <Chip
+                          label={task.count}
+                          color={task.color}
+                          size="medium"
                           sx={{ fontWeight: 700, fontSize: '0.9rem' }}
                         />
                       </Box>
@@ -358,11 +358,11 @@ const SupplyOfficerDashboard = () => {
                       </Typography>
                       <Box sx={{ mt: 2, mb: 2 }}>
                         {task.items.map((item, idx) => (
-                          <Typography 
-                            key={idx} 
-                            variant="body2" 
-                            color="text.secondary" 
-                            sx={{ 
+                          <Typography
+                            key={idx}
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
                               mb: 1,
                               display: 'flex',
                               alignItems: 'center',
@@ -378,10 +378,10 @@ const SupplyOfficerDashboard = () => {
                           </Typography>
                         ))}
                       </Box>
-                      <Button 
-                        variant="outlined" 
-                        size="small" 
-                        sx={{ 
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{
                           mt: 1,
                           borderRadius: 2,
                           borderWidth: 2,
@@ -400,20 +400,20 @@ const SupplyOfficerDashboard = () => {
             <Grid container spacing={3}>
               {/* Recent Requests */}
               <Grid item xs={12} md={8}>
-                <Card 
-                  sx={{ 
+                <Card
+                  sx={{
                     borderRadius: 3,
                     border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
-                    <Typography 
-                      variant="h6" 
-                      gutterBottom 
-                      fontWeight="600" 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                    <Typography
+                      variant="h6"
+                      gutterBottom
+                      fontWeight="600"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 1,
                         mb: 3
                       }}
@@ -424,11 +424,11 @@ const SupplyOfficerDashboard = () => {
                     <List sx={{ p: 0 }}>
                       {recentRequests.map((request, index) => (
                         <ListItem key={`${request.id}-${index}`} sx={{ px: 0, py: 1.5 }}>
-                          <Paper 
-                            sx={{ 
-                              p: 2.5, 
-                              width: '100%', 
-                              borderLeft: 4, 
+                          <Paper
+                            sx={{
+                              p: 2.5,
+                              width: '100%',
+                              borderLeft: 4,
                               borderColor: 'primary.main',
                               borderRadius: 2,
                               transition: 'all 0.2s ease',
@@ -444,8 +444,8 @@ const SupplyOfficerDashboard = () => {
                                   <Typography variant="subtitle1" fontWeight="600">
                                     {request.item}
                                   </Typography>
-                                  <Chip 
-                                    label={String(request.id).startsWith('PR') ? 'Purchase' : 'Borrow'} 
+                                  <Chip
+                                    label={String(request.id).startsWith('PR') ? 'Purchase' : 'Borrow'}
                                     size="small"
                                     color={String(request.id).startsWith('PR') ? 'primary' : 'secondary'}
                                     variant="outlined"
@@ -472,20 +472,20 @@ const SupplyOfficerDashboard = () => {
 
               {/* Quick Actions & Summary */}
               <Grid item xs={12} md={4}>
-                <Card 
-                  sx={{ 
+                <Card
+                  sx={{
                     borderRadius: 3,
                     border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
-                    <Typography 
-                      variant="h6" 
-                      gutterBottom 
-                      fontWeight="600" 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                    <Typography
+                      variant="h6"
+                      gutterBottom
+                      fontWeight="600"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 1,
                         mb: 3
                       }}
@@ -494,12 +494,12 @@ const SupplyOfficerDashboard = () => {
                       Quick Actions
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Button 
-                        variant="contained" 
+                      <Button
+                        variant="contained"
                         startIcon={<InventoryIcon />}
                         onClick={() => navigate('/inventory')}
                         size="large"
-                        sx={{ 
+                        sx={{
                           borderRadius: 2,
                           py: 1.5,
                           fontWeight: 600
@@ -507,25 +507,25 @@ const SupplyOfficerDashboard = () => {
                       >
                         Inventory Management
                       </Button>
-                      <Button 
-                        variant="outlined" 
+                      <Button
+                        variant="outlined"
                         startIcon={<PRIcon />}
-                        onClick={() => navigate('/purchase-requests')}
+                        onClick={() => navigate('/memorandum-receipts')}
                         size="large"
-                        sx={{ 
+                        sx={{
                           borderRadius: 2,
                           py: 1.5,
                           fontWeight: 600
                         }}
                       >
-                        Purchase Requests
+                        Memorandum Receipts
                       </Button>
-                      <Button 
-                        variant="outlined" 
+                      <Button
+                        variant="outlined"
                         startIcon={<BorrowIcon />}
                         onClick={() => navigate('/borrow-requests')}
                         size="large"
-                        sx={{ 
+                        sx={{
                           borderRadius: 2,
                           py: 1.5,
                           fontWeight: 600
@@ -536,14 +536,14 @@ const SupplyOfficerDashboard = () => {
                     </Box>
 
                     {/* Inventory Summary */}
-                    <Paper 
+                    <Paper
                       elevation={0}
-                      sx={{ 
-                        mt: 4, 
-                        p: 3, 
+                      sx={{
+                        mt: 4,
+                        p: 3,
                         bgcolor: alpha(theme.palette.primary.main, 0.03),
                         border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                        borderRadius: 2 
+                        borderRadius: 2
                       }}
                     >
                       <Typography variant="subtitle1" gutterBottom fontWeight="600" sx={{ mb: 2 }}>
@@ -556,18 +556,18 @@ const SupplyOfficerDashboard = () => {
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant="body2">Low Stock:</Typography>
-                          <Chip 
-                            label={items.filter(it => it.stock <= (it.low_stock_threshold || 10)).length} 
-                            size="small" 
-                            color="warning" 
+                          <Chip
+                            label={items.filter(it => it.stock <= (it.low_stock_threshold || 10)).length}
+                            size="small"
+                            color="warning"
                           />
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Typography variant="body2">Out of Stock:</Typography>
-                          <Chip 
-                            label={items.filter(it => it.stock === 0).length} 
-                            size="small" 
-                            color="error" 
+                          <Chip
+                            label={items.filter(it => it.stock === 0).length}
+                            size="small"
+                            color="error"
                           />
                         </Box>
                       </Box>

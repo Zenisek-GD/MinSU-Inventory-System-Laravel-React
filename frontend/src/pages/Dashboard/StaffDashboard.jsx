@@ -63,7 +63,7 @@ const StaffDashboard = () => {
     {
       icon: <AddIcon />,
       label: 'Request New Item',
-      description: 'Submit purchase request',
+      description: 'Submit memorandum receipt',
       path: '/request-item',
       color: 'primary'
     },
@@ -163,12 +163,12 @@ const StaffDashboard = () => {
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {quickActions.map((action, index) => (
-                    <Card 
+                    <Card
                       key={index}
-                      sx={{ 
+                      sx={{
                         cursor: 'pointer',
                         transition: 'all 0.3s ease',
-                        '&:hover': { 
+                        '&:hover': {
                           transform: 'translateY(-2px)',
                           boxShadow: 3
                         }
@@ -206,8 +206,8 @@ const StaffDashboard = () => {
                     <HistoryIcon color="primary" />
                     My Recent Requests
                   </Typography>
-                  <Button 
-                    variant="outlined" 
+                  <Button
+                    variant="outlined"
                     onClick={() => navigate('/my-requests')}
                     startIcon={<HistoryIcon />}
                   >
@@ -230,8 +230,8 @@ const StaffDashboard = () => {
                           </Box>
                           <Box sx={{ textAlign: 'right' }}>
                             {getStatusChip(request.status)}
-                            <Chip 
-                              label={request.type} 
+                            <Chip
+                              label={request.type}
                               size="small"
                               color={request.type === 'Purchase' ? 'primary' : 'secondary'}
                               sx={{ mt: 1 }}
@@ -278,9 +278,9 @@ const StaffDashboard = () => {
                     </Paper>
                   </Grid>
                 </Grid>
-                <Button 
-                  fullWidth 
-                  variant="outlined" 
+                <Button
+                  fullWidth
+                  variant="outlined"
                   sx={{ mt: 2 }}
                   onClick={() => navigate('/available-items')}
                 >

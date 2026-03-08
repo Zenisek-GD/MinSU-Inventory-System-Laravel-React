@@ -49,7 +49,7 @@ class StockMovementController extends Controller
                 $query->where('created_at', '<=', $request->to_date);
             }
 
-            $movements = $query->get();
+            $movements = $query->paginate(50);
 
             return response()->json($movements);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {

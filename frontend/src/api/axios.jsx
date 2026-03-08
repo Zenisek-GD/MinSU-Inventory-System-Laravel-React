@@ -12,4 +12,18 @@ const api = axios.create({
   withXSRFToken: true,
 });
 
+// Initialize CSRF token on app load
+const initializeCsrfToken = async () => {
+  try {
+    await axios.get('http://localhost:8000/sanctum/csrf-cookie', {
+      withCredentials: true,
+    });
+  } catch (error) {
+    console.error('Failed to initialize CSRF token:', error);
+  }
+};
+
+// Call this immediately
+initializeCsrfToken();
+
 export default api;

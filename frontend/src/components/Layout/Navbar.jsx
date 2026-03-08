@@ -32,11 +32,12 @@ import {
   Schedule as ScheduleIcon,
   Done as DoneIcon,
   Close as CloseIcon,
+  Inventory as InventoryIcon,
+  Build as BuildIcon,
 } from '@mui/icons-material';
 import { logout as logoutApi } from '../../api/Auth';
 import { useUser } from '../../context/UserContext';
-import { fetchBorrows } from '../../api/borrow';
-import { fetchPurchaseRequests } from '../../api/purchaseRequest';
+import { fetchNotificationAlerts } from '../../api/reports';
 
 const Navbar = ({ onMenuToggle }) => {
   const theme = useTheme();
@@ -50,144 +51,80 @@ const Navbar = ({ onMenuToggle }) => {
   useEffect(() => {
     if (user?.id) {
       loadNotifications();
-      // Refresh notifications every 60 seconds
-      const interval = setInterval(loadNotifications, 60000);
-      return () => clearInterval(interval);
+      // Removed auto-polling - only load on mount
     }
   }, [user?.id]);
 
+  const getNotifIcon = (type) => {
+    switch (type) {
+      case 'borrow_pending': return <AssignmentIcon />;
+      case 'borrow_overdue': return <WarningIcon />;
+      case 'low_stock': return <InventoryIcon />;
+      case 'needs_maintenance': return <BuildIcon />;
+      case 'borrow_approved': return <CheckCircleIcon />;
+      case 'borrow_rejected': return <CloseIcon />;
+      case 'return_reminder': return <ScheduleIcon />;
+      default: return <InfoIcon />;
+    }
+  };
+
   const loadNotifications = async () => {
     try {
-      // Avoid duplicate polling while on borrows pages
-      if (location.pathname === '/borrows' || location.pathname === '/current-borrows') return;
-      // Pause when tab is not visible
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      const notifs = [];
-      const now = new Date();
 
-      // Load borrow requests
-      const borrowsData = await fetchBorrows({});
-      const borrows = Array.isArray(borrowsData) ? borrowsData : borrowsData.data || [];
-
-      // For admin/supply officer: pending borrow requests
       if (user?.role === 'admin' || user?.role === 'supply_officer') {
-        const pendingBorrows = borrows.filter(b => b.status === 'Pending');
-        pendingBorrows.forEach(b => {
-          notifs.push({
-            id: `borrow-${b.id}`,
-            type: 'borrow_pending',
-            title: 'New Borrow Request',
-            message: `${b.borrowed_by?.name || b.borrowedBy?.name} requested to borrow ${b.item?.name}`,
-            time: new Date(b.created_at),
-            icon: <AssignmentIcon />,
-            color: 'warning',
-            link: '/borrows'
-          });
-        });
+        // Use the aggregated alerts endpoint (pending borrows + overdue + low-stock + maintenance)
+        const res = await fetchNotificationAlerts();
+        const alerts = (res?.data || []).map(a => ({
+          ...a,
+          time: a.time ? new Date(a.time) : new Date(),
+          icon: getNotifIcon(a.type),
+        }));
+        setNotifications(alerts.slice(0, 15));
+      } else if (user?.role === 'staff') {
+        // For staff: load only their own borrow records from the reports/borrows endpoint
+        const { fetchBorrowsReport } = await import('../../api/reports');
+        const res = await fetchBorrowsReport({});
+        const borrows = res?.data || [];
+        const now = new Date();
+        const notifs = [];
 
-        // Overdue borrows
-        const overdueBorrows = borrows.filter(b => 
-          b.status === 'Approved' && 
-          b.expected_return_date && 
-          new Date(b.expected_return_date) < now
-        );
-        overdueBorrows.forEach(b => {
-          notifs.push({
-            id: `overdue-${b.id}`,
-            type: 'borrow_overdue',
-            title: 'Overdue Borrow',
-            message: `${b.item?.name} is overdue by ${Math.floor((now - new Date(b.expected_return_date)) / (1000 * 60 * 60 * 24))} days`,
-            time: new Date(b.expected_return_date),
-            icon: <WarningIcon />,
-            color: 'error',
-            link: '/borrows'
+        borrows
+          .filter(b => b.borrowed_by === user?.id || b.borrowedBy?.id === user?.id)
+          .forEach(b => {
+            if (b.status === 'Approved') {
+              notifs.push({
+                id: `borrow-approved-${b.id}`, type: 'borrow_approved',
+                title: 'Borrow Request Approved',
+                message: `Your request for ${b.item?.name} has been approved`,
+                time: new Date(b.updated_at), icon: <CheckCircleIcon />, color: 'success', link: '/borrows',
+              });
+              // Return reminder (within 3 days)
+              if (b.expected_return_date) {
+                const returnDate = new Date(b.expected_return_date);
+                const days = Math.floor((returnDate - now) / 86400000);
+                if (days >= 0 && days <= 3) {
+                  notifs.push({
+                    id: `return-reminder-${b.id}`, type: 'return_reminder',
+                    title: 'Return Reminder',
+                    message: `${b.item?.name} is due in ${days} day${days !== 1 ? 's' : ''}`,
+                    time: returnDate, icon: <ScheduleIcon />, color: days === 0 ? 'error' : 'warning', link: '/borrows',
+                  });
+                }
+              }
+            } else if (b.status === 'Rejected') {
+              notifs.push({
+                id: `borrow-rejected-${b.id}`, type: 'borrow_rejected',
+                title: 'Borrow Request Rejected',
+                message: `Your request for ${b.item?.name} was not approved`,
+                time: new Date(b.updated_at), icon: <CloseIcon />, color: 'error', link: '/borrows',
+              });
+            }
           });
-        });
 
-        // Temporarily disable PR notifications
-        /*
-        // Load purchase requests - wrap in try/catch to prevent error from breaking notifications
-        try {
-          const prData = await fetchPurchaseRequests();
-          const prs = Array.isArray(prData) ? prData : prData.data || [];
-          const pendingPRs = prs.filter(pr => pr.status === 'Pending');
-          pendingPRs.forEach(pr => {
-            notifs.push({
-              id: `pr-${pr.id}`,
-              type: 'pr_pending',
-              title: 'New Purchase Request',
-              message: `${pr.requested_by?.name || pr.requestedBy?.name} requested ${pr.items?.length || 0} items`,
-              time: new Date(pr.created_at),
-              icon: <InfoIcon />,
-              color: 'info',
-              link: '/purchase-requests'
-            });
-          });
-        } catch (prError) {
-          // Silently ignore PR notification errors
-        }
-        */
+        notifs.sort((a, b) => b.time - a.time);
+        setNotifications(notifs.slice(0, 10));
       }
-
-      // For staff: their approved/rejected borrow requests
-      if (user?.role === 'staff') {
-        const myBorrows = borrows.filter(b => 
-          b.user_id === user?.id && 
-          (b.status === 'Approved' || b.status === 'Rejected')
-        );
-        myBorrows.forEach(b => {
-          if (b.status === 'Approved') {
-            notifs.push({
-              id: `borrow-approved-${b.id}`,
-              type: 'borrow_approved',
-              title: 'Borrow Request Approved',
-              message: `Your request for ${b.item?.name} has been approved`,
-              time: new Date(b.updated_at),
-              icon: <CheckCircleIcon />,
-              color: 'success',
-              link: '/borrows'
-            });
-          } else if (b.status === 'Rejected') {
-            notifs.push({
-              id: `borrow-rejected-${b.id}`,
-              type: 'borrow_rejected',
-              title: 'Borrow Request Rejected',
-              message: `Your request for ${b.item?.name} was not approved`,
-              time: new Date(b.updated_at),
-              icon: <CloseIcon />,
-              color: 'error',
-              link: '/borrows'
-            });
-          }
-        });
-
-        // Upcoming return dates
-        const upcomingReturns = borrows.filter(b => 
-          b.user_id === user?.id &&
-          b.status === 'Approved' && 
-          b.expected_return_date
-        );
-        upcomingReturns.forEach(b => {
-          const returnDate = new Date(b.expected_return_date);
-          const daysUntilReturn = Math.floor((returnDate - now) / (1000 * 60 * 60 * 24));
-          if (daysUntilReturn >= 0 && daysUntilReturn <= 3) {
-            notifs.push({
-              id: `return-reminder-${b.id}`,
-              type: 'return_reminder',
-              title: 'Return Reminder',
-              message: `${b.item?.name} is due in ${daysUntilReturn} day${daysUntilReturn !== 1 ? 's' : ''}`,
-              time: returnDate,
-              icon: <ScheduleIcon />,
-              color: daysUntilReturn === 0 ? 'error' : 'warning',
-              link: '/borrows'
-            });
-          }
-        });
-      }
-
-      // Sort by time (most recent first)
-      notifs.sort((a, b) => b.time - a.time);
-      setNotifications(notifs.slice(0, 10)); // Keep only latest 10
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
@@ -248,7 +185,7 @@ const Navbar = ({ onMenuToggle }) => {
       '/users': 'Manage Users',
       '/items': 'Manage Items',
       '/categories': 'Manage Categories',
-      '/purchase-requests': 'Purchase Requests',
+      '/memorandum-receipts': 'Memorandum Receipts',
       '/borrow-requests': 'Borrow Requests',
       '/inventory': 'Inventory Management',
       '/my-requests': 'My Requests',
@@ -263,9 +200,9 @@ const Navbar = ({ onMenuToggle }) => {
   };
 
   return (
-    <AppBar 
-      position="fixed" 
-      sx={{ 
+    <AppBar
+      position="fixed"
+      sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
         background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)',
         color: 'white',
@@ -279,8 +216,8 @@ const Navbar = ({ onMenuToggle }) => {
           aria-label="open drawer"
           edge="start"
           onClick={onMenuToggle}
-          sx={{ 
-            mr: 2, 
+          sx={{
+            mr: 2,
             display: { md: 'none' },
             '&:hover': {
               backgroundColor: 'rgba(255, 255, 255, 0.1)'
@@ -289,29 +226,30 @@ const Navbar = ({ onMenuToggle }) => {
         >
           <MenuIcon />
         </IconButton>
-        
+
         <Box sx={{ flexGrow: 1 }}>
           <Typography variant="h6" noWrap component="div" fontWeight="bold" fontSize="1.25rem">
-            MinSU Inventory Management System
+            MinSU Real-Time Supply Operations Management System
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.75rem' }}>
             Bongabong Campus
           </Typography>
         </Box>
-        
+
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* Quick QR Scanner */}
-          <IconButton 
+          {/* Mobile Scanner */}
+          <IconButton
             color="inherit"
-            onClick={() => navigate('/qr-scanner')}
+            onClick={() => navigate('/scanner/desktop-mobile')}
             sx={{
               '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
             }}
+            title="Mobile Scanner - Desktop Controller"
           >
             <QrCodeIcon />
           </IconButton>
 
-          <IconButton 
+          <IconButton
             color="inherit"
             onClick={handleNotificationOpen}
             sx={{
@@ -330,7 +268,7 @@ const Navbar = ({ onMenuToggle }) => {
               <NotificationsIcon />
             </Badge>
           </IconButton>
-          
+
           <IconButton
             onClick={handleProfileMenuOpen}
             color="inherit"
@@ -340,10 +278,10 @@ const Navbar = ({ onMenuToggle }) => {
               }
             }}
           >
-            <Avatar 
-              sx={{ 
-                width: 36, 
-                height: 36, 
+            <Avatar
+              sx={{
+                width: 36,
+                height: 36,
                 bgcolor: '#FFD700',
                 color: '#006400',
                 fontWeight: 'bold',
@@ -354,7 +292,7 @@ const Navbar = ({ onMenuToggle }) => {
             </Avatar>
           </IconButton>
         </Box>
-        
+
         {/* Notifications Menu */}
         <Menu
           anchorEl={notificationAnchor}
@@ -378,18 +316,20 @@ const Navbar = ({ onMenuToggle }) => {
               {notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}
             </Typography>
           </Box>
-          
-          {notifications.length === 0 ? (
+
+          {notifications.length === 0 && (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <NotificationsIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
               <Typography variant="body2" color="text.secondary">
                 No new notifications
               </Typography>
             </Box>
-          ) : (
+          )}
+
+          {notifications.length > 0 && [
             notifications.map((notif, index) => (
-              <React.Fragment key={notif.id}>
-                <MenuItem 
+              <Box key={`notif-${notif.id}`}>
+                <MenuItem
                   onClick={() => handleNotificationClick(notif)}
                   sx={{
                     py: 1.5,
@@ -401,10 +341,10 @@ const Navbar = ({ onMenuToggle }) => {
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: 40, mt: 0.5 }}>
-                    <Avatar 
-                      sx={{ 
-                        width: 32, 
-                        height: 32, 
+                    <Avatar
+                      sx={{
+                        width: 32,
+                        height: 32,
                         bgcolor: alpha(theme.palette[notif.color].main, 0.1),
                         color: `${notif.color}.main`
                       }}
@@ -431,31 +371,26 @@ const Navbar = ({ onMenuToggle }) => {
                   />
                 </MenuItem>
                 {index < notifications.length - 1 && <Divider />}
-              </React.Fragment>
-            ))
-          )}
-          
-          {notifications.length > 0 && (
-            <>
-              <Divider />
-              <Box sx={{ p: 1, textAlign: 'center' }}>
-                <MenuItem 
-                  onClick={() => {
-                    setNotifications([]);
-                    handleNotificationClose();
-                  }}
-                  sx={{ justifyContent: 'center', color: 'primary.main' }}
-                >
-                  <DoneIcon fontSize="small" sx={{ mr: 1 }} />
-                  <Typography variant="body2" fontWeight={600}>
-                    Mark all as read
-                  </Typography>
-                </MenuItem>
               </Box>
-            </>
-          )}
+            )),
+            <Divider key="divider-1" />,
+            <Box key="mark-all" sx={{ p: 1, textAlign: 'center' }}>
+              <MenuItem
+                onClick={() => {
+                  setNotifications([]);
+                  handleNotificationClose();
+                }}
+                sx={{ justifyContent: 'center', color: 'primary.main' }}
+              >
+                <DoneIcon fontSize="small" sx={{ mr: 1 }} />
+                <Typography variant="body2" fontWeight={600}>
+                  Mark all as read
+                </Typography>
+              </MenuItem>
+            </Box>
+          ]}
         </Menu>
-        
+
         {/* Profile Menu */}
         <Menu
           anchorEl={anchorEl}

@@ -1,25 +1,64 @@
-import axios from "../api/axios"; // your Axios instance with baseURL and withCredentials
+import api from "../api/axios"; // your Axios instance with baseURL and withCredentials
+import axios from "axios";
 
 export const getCsrfCookie = async () => {
-  return axios.get("http://localhost:8000/sanctum/csrf-cookie", {
-    withCredentials: true,
-  });
+  try {
+    return await axios.get("http://localhost:8000/sanctum/csrf-cookie", {
+      withCredentials: true,
+    });
+  } catch (error) {
+    console.error('CSRF cookie error:', error);
+    throw error;
+  }
 };
 
 export const login = async (credentials) => {
-  await getCsrfCookie(); // ✅ ensure CSRF cookie is set
-  return axios.post("/login", credentials, { withCredentials: true });
+  try {
+    await getCsrfCookie(); // ✅ ensure CSRF cookie is set
+    const response = await api.post("/login", credentials, { withCredentials: true });
+    return response.data;
+  } catch (error) {
+    console.error('Login error:', error);
+    if (error.response) {
+      throw error.response.data;
+    }
+    throw error;
+  }
 };
 
 export const register = async (data) => {
-  await getCsrfCookie(); // ✅ ensure CSRF cookie is set
-  return axios.post("/register", data, { withCredentials: true });
+  try {
+    await getCsrfCookie(); // ✅ ensure CSRF cookie is set
+    const response = await api.post("/register", data, { withCredentials: true });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw error.response.data;
+    }
+    throw error;
+  }
 };
 
 export const logout = async () => {
-  return axios.post("/logout", {}, { withCredentials: true });
+  try {
+    const response = await api.post("/logout", {}, { withCredentials: true });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw error.response.data;
+    }
+    throw error;
+  }
 };
 
 export const getProfile = async () => {
-  return axios.get("/profile", { withCredentials: true });
+  try {
+    const response = await api.get("/profile", { withCredentials: true });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw error.response.data;
+    }
+    throw error;
+  }
 };

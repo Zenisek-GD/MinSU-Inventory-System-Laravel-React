@@ -97,6 +97,7 @@ const ItemsPage = () => {
     name: "",
     description: "",
     category_id: "",
+    fund_cluster: "General Trust Fund",
     office_id: "",
     status: "Available",
     serial_number: "",
@@ -156,7 +157,7 @@ const ItemsPage = () => {
       const result = await createItem(newItem);
       setItems(prev => [result.item, ...prev]);
       setNewItem({
-        name: "", description: "", category_id: "", office_id: "", status: "Available",
+        name: "", description: "", category_id: "", fund_cluster: "General Trust Fund", office_id: "", status: "Available",
         serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "",
         last_condition_check: ""
       });
@@ -175,6 +176,7 @@ const ItemsPage = () => {
       name: item.name,
       description: item.description,
       category_id: item.category_id,
+      fund_cluster: item.fund_cluster || "General Trust Fund",
       office_id: item.office_id,
       status: item.status,
       serial_number: item.serial_number,
@@ -204,6 +206,7 @@ const ItemsPage = () => {
         name: "",
         description: "",
         category_id: "",
+        fund_cluster: "General Trust Fund",
         office_id: "",
         status: "Available",
         serial_number: "",
@@ -291,6 +294,15 @@ const ItemsPage = () => {
     }
   };
 
+  const getFundClusterColor = (fund) => {
+    const f = (fund || "General Trust Fund").toLowerCase();
+    if (f.includes("general")) return "#2196F3"; // Blue
+    if (f.includes("special")) return "#4CAF50"; // Green
+    if (f.includes("tef")) return "#FF9800"; // Orange
+    if (f.includes("mds") || f.includes("raf")) return "#9C27B0"; // Purple
+    return "#757575"; // Grey
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -374,9 +386,9 @@ const ItemsPage = () => {
             bgcolor: 'background.paper',
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
           }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Box>
-                <Typography variant="h5" fontWeight="800" color="primary.main">
+                <Typography variant="h5" fontWeight="800" color="#006400">
                   Inventory Items
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -384,16 +396,16 @@ const ItemsPage = () => {
                 </Typography>
               </Box>
               <Tooltip title="Refresh">
-                <IconButton onClick={loadAll} sx={{ color: 'primary.main' }}>
+                <IconButton onClick={loadAll} sx={{ color: '#006400' }}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
             </Box>
             
-            <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
               <TextField
                 fullWidth
-                placeholder="Search items..."
+                placeholder="Search items by name, description..."
                 variant="outlined"
                 size="small"
                 value={searchQuery}
@@ -404,7 +416,14 @@ const ItemsPage = () => {
                       <SearchIcon color="action" />
                     </InputAdornment>
                   ),
-                  sx: { borderRadius: 2, bgcolor: 'background.paper' }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: '#fafafa',
+                    '&:hover': { backgroundColor: '#f5f5f5' },
+                    transition: 'all 0.2s'
+                  }
                 }}
               />
               <Button
@@ -414,32 +433,41 @@ const ItemsPage = () => {
                 sx={{ 
                   borderRadius: 2,
                   px: 3,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  bgcolor: '#006400',
+                  '&:hover': { bgcolor: '#004d00' },
+                  fontWeight: 600,
+                  textTransform: 'none'
                 }}
               >
-                Add
+                Add Item
               </Button>
             </Stack>
 
             {/* Stats Overview */}
-            <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1.5} sx={{ mt: 2, flexWrap: 'wrap' }}>
               <Chip 
                 label={`${items.filter(i => i.status === 'Available').length} Available`} 
                 color="success" 
                 size="small" 
-                variant="outlined"
+                variant="filled"
+                icon={<CheckCircle sx={{ fontSize: 16 }} />}
+                sx={{ fontWeight: 600 }}
               />
               <Chip 
                 label={`${items.filter(i => i.status === 'Borrowed').length} Borrowed`} 
                 color="warning" 
                 size="small" 
-                variant="outlined"
+                variant="filled"
+                icon={<WarningIcon sx={{ fontSize: 16 }} />}
+                sx={{ fontWeight: 600 }}
               />
               <Chip 
-                label={`${items.filter(i => needsConditionCheck(i)).length} Needs Check`} 
+                label={`${items.filter(i => needsConditionCheck(i)).length} Need Check`} 
                 color="error" 
                 size="small" 
-                variant="outlined"
+                variant="filled"
+                icon={<AlertIcon sx={{ fontSize: 16 }} />}
+                sx={{ fontWeight: 600 }}
               />
             </Stack>
           </Box>
@@ -452,9 +480,9 @@ const ItemsPage = () => {
                   <Skeleton 
                     key={index}
                     variant="rectangular" 
-                    height={100} 
+                    height={110} 
                     sx={{ 
-                      borderRadius: 2, 
+                      borderRadius: 2.5, 
                       mb: 2,
                       animation: 'pulse 1.5s ease-in-out infinite'
                     }} 
@@ -464,7 +492,7 @@ const ItemsPage = () => {
             ) : error ? (
               <Alert 
                 severity="error" 
-                sx={{ m: 2 }}
+                sx={{ m: 2, borderRadius: 2 }}
                 action={
                   <Button color="inherit" size="small" onClick={loadAll}>
                     Retry
@@ -491,40 +519,50 @@ const ItemsPage = () => {
                 </Typography>
               </Box>
             ) : (
-              <List sx={{ p: 1 }}>
+              <List sx={{ p: 0 }}>
                 {filteredItems.map(item => (
                   <Fade in key={item.id}>
                     <Card
-                      elevation={selectedItem?.id === item.id ? 3 : 1}
+                      elevation={selectedItem?.id === item.id ? 4 : 0}
                       sx={{
                         mb: 2,
-                        borderRadius: 3,
+                        borderRadius: 2.5,
                         cursor: 'pointer',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: selectedItem?.id === item.id ? `2px solid ${theme.palette.primary.main}` : 'none',
+                        border: selectedItem?.id === item.id ? `2.5px solid #006400` : '1px solid #e0e0e0',
+                        backgroundColor: selectedItem?.id === item.id ? 'rgba(0, 100, 0, 0.02)' : 'background.paper',
                         '&:hover': {
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                          borderColor: 'primary.light'
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+                          borderColor: '#80c080'
                         }
                       }}
                       onClick={() => setSelectedItem(item)}
                     >
                       <CardActionArea>
-                        <CardContent sx={{ p: 2 }}>
+                        <CardContent sx={{ p: 2.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                             <Badge
                               badgeContent={needsConditionCheck(item) ? "!" : null}
                               color="error"
                               invisible={!needsConditionCheck(item)}
+                              sx={{
+                                '& .MuiBadge-badge': {
+                                  backgroundColor: '#d32f2f',
+                                  color: '#fff',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700
+                                }
+                              }}
                             >
                               <Avatar
                                 sx={{
-                                  bgcolor: alpha(theme.palette[getStatusConfig(item.display_status || item.status).color].main, 0.1),
+                                  bgcolor: alpha(theme.palette[getStatusConfig(item.display_status || item.status).color].main, 0.12),
                                   color: theme.palette[getStatusConfig(item.display_status || item.status).color].main,
-                                  width: 48,
-                                  height: 48,
-                                  borderRadius: 2
+                                  width: 56,
+                                  height: 56,
+                                  borderRadius: 2,
+                                  fontSize: '1.5rem'
                                 }}
                               >
                                 <InventoryIcon />
@@ -532,14 +570,14 @@ const ItemsPage = () => {
                             </Badge>
                             
                             <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
                                 <Typography 
                                   variant="subtitle1" 
-                                  fontWeight="600" 
+                                  fontWeight="700" 
                                   noWrap 
                                   sx={{ 
-                                    maxWidth: '200px',
-                                    color: 'text.primary'
+                                    maxWidth: '170px',
+                                    color: selectedItem?.id === item.id ? '#006400' : 'text.primary'
                                   }}
                                 >
                                   {item.name}
@@ -550,9 +588,9 @@ const ItemsPage = () => {
                                   color={getStatusConfig(item.display_status || item.status).color}
                                   size="small"
                                   sx={{ 
-                                    height: 24,
-                                    fontWeight: 500,
-                                    fontSize: '0.75rem'
+                                    height: 26,
+                                    fontWeight: 600,
+                                    fontSize: '0.8rem'
                                   }}
                                 />
                               </Box>
@@ -563,21 +601,33 @@ const ItemsPage = () => {
                                 sx={{ 
                                   mb: 1.5,
                                   display: '-webkit-box',
-                                  WebkitLineClamp: 2,
+                                  WebkitLineClamp: 1,
                                   WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden'
+                                  overflow: 'hidden',
+                                  fontSize: '0.9rem'
                                 }}
                               >
                                 {item.description || 'No description'}
                               </Typography>
                               
-                              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                              <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                                 <Chip
                                   label={item.condition}
                                   color={getConditionColor(item.condition)}
                                   size="small"
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                  variant="filled"
+                                  sx={{ fontSize: '0.75rem', height: 24, fontWeight: 600 }}
+                                />
+                                <Chip
+                                  label={item.fund_cluster || "General Trust Fund"}
+                                  size="small"
+                                  sx={{
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    fontWeight: 600,
+                                    bgcolor: getFundClusterColor(item.fund_cluster),
+                                    color: '#fff'
+                                  }}
                                 />
                                 <Typography 
                                   variant="caption" 
@@ -585,20 +635,35 @@ const ItemsPage = () => {
                                   sx={{ 
                                     display: 'flex', 
                                     alignItems: 'center',
-                                    gap: 0.5
+                                    gap: 0.5,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500
                                   }}
                                 >
-                                  <CategoryIcon sx={{ fontSize: 12 }} />
+                                  <CategoryIcon sx={{ fontSize: 14 }} />
                                   {item.category?.name || categories.find(c => c.id === item.category_id)?.name || 'Uncategorized'}
                                 </Typography>
                                 {item.currentBorrow && (
                                   <Chip
-                                    icon={<PersonIcon sx={{ fontSize: 12 }} />}
+                                    icon={<PersonIcon sx={{ fontSize: 13 }} />}
                                     label={`Borrowed`}
                                     size="small"
                                     color="warning"
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.7rem', height: 20 }}
+                                    variant="filled"
+                                    sx={{ fontSize: '0.75rem', height: 24, fontWeight: 600 }}
+                                  />
+                                )}
+                                {item.currentMR && (
+                                  <Chip
+                                    label={item.currentMR.mr_number}
+                                    size="small"
+                                    sx={{ 
+                                      fontSize: '0.75rem', 
+                                      height: 24,
+                                      fontWeight: 700,
+                                      bgcolor: '#4caf50',
+                                      color: '#fff'
+                                    }}
                                   />
                                 )}
                               </Stack>
@@ -635,12 +700,12 @@ const ItemsPage = () => {
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'flex-start', 
-                      mb: 3,
+                      mb: 3.5,
                       gap: 2
                     }}>
                       <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                          <Typography variant="h4" fontWeight="800" color="primary.main">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                          <Typography variant="h4" fontWeight="800" sx={{ color: '#006400' }}>
                             {selectedItem.name}
                           </Typography>
                           <Chip
@@ -648,22 +713,22 @@ const ItemsPage = () => {
                             label={getStatusConfig(selectedItem.display_status || selectedItem.status).label}
                             color={getStatusConfig(selectedItem.display_status || selectedItem.status).color}
                             size="medium"
-                            sx={{ fontWeight: 600 }}
+                            sx={{ fontWeight: 700 }}
                           />
                         </Box>
-                        <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.6 }}>
                           {selectedItem.description || 'No description provided'}
                         </Typography>
                         
-                        <Stack direction="row" spacing={2}>
+                        <Stack direction="row" spacing={1.5}>
                           <Tooltip title="Edit Item">
                             <IconButton
                               size="small"
                               onClick={() => handleEdit(selectedItem)}
                               sx={{ 
-                                bgcolor: 'primary.main',
-                                color: 'white',
-                                '&:hover': { bgcolor: 'primary.dark' }
+                                bgcolor: 'rgba(0, 100, 0, 0.1)',
+                                color: '#006400',
+                                '&:hover': { bgcolor: 'rgba(0, 100, 0, 0.2)' }
                               }}
                             >
                               <EditIcon />
@@ -674,9 +739,9 @@ const ItemsPage = () => {
                               size="small"
                               onClick={() => setQrPrintOpen(true)}
                               sx={{ 
-                                bgcolor: 'success.main',
-                                color: 'white',
-                                '&:hover': { bgcolor: 'success.dark' }
+                                bgcolor: 'rgba(0, 100, 0, 0.1)',
+                                color: '#006400',
+                                '&:hover': { bgcolor: 'rgba(0, 100, 0, 0.2)' }
                               }}
                             >
                               <PrintIcon />
@@ -687,9 +752,9 @@ const ItemsPage = () => {
                               size="small"
                               onClick={() => handleDelete(selectedItem.id)}
                               sx={{ 
-                                bgcolor: 'error.main',
-                                color: 'white',
-                                '&:hover': { bgcolor: 'error.dark' }
+                                bgcolor: 'rgba(244, 67, 54, 0.1)',
+                                color: '#f44336',
+                                '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.2)' }
                               }}
                             >
                               <DeleteIcon />
@@ -699,7 +764,7 @@ const ItemsPage = () => {
                       </Box>
                     </Box>
 
-                    <Divider sx={{ my: 4, borderColor: 'divider', borderWidth: 1 }} />
+                    <Divider sx={{ my: 3.5, borderColor: '#e8e8e8', borderWidth: 1.5 }} />
 
                     {/* Condition Check Alert */}
                     {needsConditionCheck(selectedItem) && (
@@ -707,17 +772,22 @@ const ItemsPage = () => {
                         severity="warning" 
                         icon={<AlertIcon />}
                         sx={{ 
-                          mb: 4,
-                          borderRadius: 2,
-                          bgcolor: 'warning.50',
-                          border: '1px solid',
-                          borderColor: 'warning.light'
+                          mb: 3.5,
+                          borderRadius: 2.5,
+                          bgcolor: '#fffbf0',
+                          border: '1.5px solid #ffe082',
+                          '& .MuiAlert-icon': { color: '#f57c00' }
                         }}
                         action={
                           <Button 
                             color="inherit" 
                             size="small"
                             variant="outlined"
+                            sx={{
+                              color: '#f57c00',
+                              borderColor: '#f57c00',
+                              '&:hover': { borderColor: '#e65100', backgroundColor: '#fffbf0' }
+                            }}
                             onClick={() => {
                               setNewItem({
                                 ...newItem,
@@ -730,7 +800,7 @@ const ItemsPage = () => {
                           </Button>
                         }
                       >
-                        <Typography variant="subtitle2" fontWeight="600">
+                        <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 0.5 }}>
                           ⚠️ Annual Condition Check Required
                         </Typography>
                         <Typography variant="body2">
@@ -742,68 +812,96 @@ const ItemsPage = () => {
                     )}
 
                     {/* Information Cards */}
-                    <Grid container spacing={3}>
+                    <Grid container spacing={2.5}>
                       {/* Basic Information Card */}
                       <Grid item xs={12} md={6}>
-                        <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+                        <Card sx={{ 
+                          borderRadius: 2.5, 
+                          height: '100%',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                            transition: 'all 0.3s'
+                          }
+                        }}>
                           <CardContent>
-                            <Typography variant="h6" fontWeight="600" gutterBottom sx={{ 
+                            <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
                               display: 'flex', 
                               alignItems: 'center', 
-                              gap: 1,
-                              mb: 3 
+                              gap: 1.5,
+                              mb: 3,
+                              color: '#006400'
                             }}>
-                              <InfoIcon color="primary" /> Basic Information
+                              <InfoIcon sx={{ color: '#006400' }} /> Basic Information
                             </Typography>
                             
-                            <Stack spacing={2}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <CategoryIcon sx={{ color: 'primary.main' }} />
+                            <Stack spacing={2.5}>
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <CategoryIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Category
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="600">
                                     {selectedItem.category?.name || categories.find(c => c.id === selectedItem.category_id)?.name || 'N/A'}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <OfficeIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <OfficeIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
-                                    Office
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    Office Location
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="600">
                                     {selectedItem.office?.name || offices.find(o => o.id === selectedItem.office_id)?.name || 'N/A'}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <InventoryIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <InventoryIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Serial Number
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
                                     {selectedItem.serial_number || 'N/A'}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <ConditionIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <Typography sx={{ fontSize: 20, mt: 0.5 }}>💰</Typography>
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    Fund Cluster
+                                  </Typography>
+                                  <Chip
+                                    label={selectedItem.fund_cluster || "General Trust Fund"}
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: getFundClusterColor(selectedItem.fund_cluster),
+                                      color: '#fff',
+                                      fontSize: '0.85rem'
+                                    }}
+                                  />
+                                </Box>
+                              </Box>
+                              
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <ConditionIcon sx={{ color: '#006400', mt: 0.5 }} />
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Condition
                                   </Typography>
                                   <Chip
                                     label={selectedItem.condition}
                                     color={getConditionColor(selectedItem.condition)}
                                     size="medium"
-                                    sx={{ fontWeight: 500 }}
+                                    sx={{ fontWeight: 700 }}
                                   />
                                 </Box>
                               </Box>
@@ -814,58 +912,68 @@ const ItemsPage = () => {
 
                       {/* Purchase Details Card */}
                       <Grid item xs={12} md={6}>
-                        <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+                        <Card sx={{ 
+                          borderRadius: 2.5, 
+                          height: '100%',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                            transition: 'all 0.3s'
+                          }
+                        }}>
                           <CardContent>
-                            <Typography variant="h6" fontWeight="600" gutterBottom sx={{ 
+                            <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
                               display: 'flex', 
                               alignItems: 'center', 
-                              gap: 1,
-                              mb: 3 
+                              gap: 1.5,
+                              mb: 3,
+                              color: '#006400'
                             }}>
-                              <PriceIcon color="primary" /> Purchase Details
+                              <PriceIcon sx={{ color: '#006400' }} /> Purchase Details
                             </Typography>
                             
-                            <Stack spacing={2}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <DateIcon sx={{ color: 'primary.main' }} />
+                            <Stack spacing={2.5}>
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <DateIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Purchase Date
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="600">
                                     {formatDate(selectedItem.purchase_date)}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <PriceIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <PriceIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Purchase Price
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="700" sx={{ color: '#006400' }}>
                                     {formatCurrency(selectedItem.purchase_price)}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <DateIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <DateIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Warranty Expiry
                                   </Typography>
-                                  <Typography variant="body1" fontWeight="500">
+                                  <Typography variant="body2" fontWeight="600">
                                     {formatDate(selectedItem.warranty_expiry)}
                                   </Typography>
                                 </Box>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <ScheduleIcon sx={{ color: 'primary.main' }} />
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                <ScheduleIcon sx={{ color: '#006400', mt: 0.5 }} />
                                 <Box sx={{ flex: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                     Last Condition Check
                                   </Typography>
                                   <Typography variant="body1" fontWeight="500">
@@ -883,19 +991,33 @@ const ItemsPage = () => {
                       {/* Notes Card */}
                       {selectedItem.notes && (
                         <Grid item xs={12}>
-                          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                          <Card sx={{ 
+                            borderRadius: 2.5,
+                            border: '1px solid #e8e8e8',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                              transition: 'all 0.3s'
+                            }
+                          }}>
                             <CardContent>
-                              <Typography variant="h6" fontWeight="600" gutterBottom sx={{ mb: 2 }}>
-                                Additional Notes
+                              <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 1.5,
+                                mb: 3,
+                                color: '#006400'
+                              }}>
+                                <InfoIcon sx={{ color: '#006400' }} /> Additional Notes
                               </Typography>
                               <Paper sx={{ 
                                 p: 2.5, 
-                                bgcolor: 'grey.50', 
-                                borderRadius: 2,
-                                border: '1px solid',
-                                borderColor: 'divider'
+                                bgcolor: '#fafaf8', 
+                                borderRadius: 2.5,
+                                border: '1px solid #e8e8e8',
+                                lineHeight: 1.8
                               }}>
-                                <Typography variant="body1" sx={{ lineHeight: 1.7 }}>
+                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
                                   {selectedItem.notes}
                                 </Typography>
                               </Paper>
@@ -904,48 +1026,141 @@ const ItemsPage = () => {
                         </Grid>
                       )}
 
+                      {/* MR Assignment Card */}
+                      {selectedItem.currentMR && (
+                        <Grid item xs={12}>
+                          <Card sx={{ 
+                            borderRadius: 2.5,
+                            border: '1.5px solid #4caf50',
+                            boxShadow: '0 2px 8px rgba(76, 175, 80, 0.08)',
+                            bgcolor: '#f8fff6',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(76, 175, 80, 0.12)',
+                              transition: 'all 0.3s'
+                            }
+                          }}>
+                            <CardContent>
+                              <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 1.5,
+                                mb: 3,
+                                color: '#2e7d32'
+                              }}>
+                                <CheckCircleIcon sx={{ color: '#4caf50', fontSize: 28 }} /> Assigned to Memorandum Receipt
+                              </Typography>
+                              
+                              <Grid container spacing={2.5}>
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <Typography sx={{ fontSize: 20, mt: 0.5 }}>📌</Typography>
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        MR Number
+                                      </Typography>
+                                      <Chip 
+                                        label={selectedItem.currentMR.mr_number}
+                                        sx={{ fontWeight: 700, bgcolor: '#e8f5e9', color: '#2e7d32' }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                                
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <PersonIcon sx={{ color: '#2e7d32', mt: 0.5 }} />
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        Accountable Officer
+                                      </Typography>
+                                      <Typography variant="body2" fontWeight="600">
+                                        {selectedItem.currentMR.accountable_officer}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <OfficeIcon sx={{ color: '#2e7d32', mt: 0.5 }} />
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        Entity
+                                      </Typography>
+                                      <Typography variant="body2" fontWeight="600">
+                                        {selectedItem.currentMR.entity_name}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <CheckIcon sx={{ color: '#2e7d32', mt: 0.5 }} />
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        MR Status
+                                      </Typography>
+                                      <Chip 
+                                        label={selectedItem.currentMR.status}
+                                        sx={{ fontWeight: 700, bgcolor: '#c8e6c9', color: '#1b5e20' }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                </Grid>
+                              </Grid>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      )}
+
                       {/* Borrow Information Card */}
                       {selectedItem.currentBorrow && (
                         <Grid item xs={12}>
-                          <Card variant="outlined" sx={{ 
-                            borderRadius: 2,
-                            borderColor: 'warning.main',
-                            bgcolor: 'warning.50'
+                          <Card sx={{ 
+                            borderRadius: 2.5,
+                            border: '1.5px solid #ff9800',
+                            boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
+                            bgcolor: '#fffbf6',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(255, 152, 0, 0.12)',
+                              transition: 'all 0.3s'
+                            }
                           }}>
                             <CardContent>
-                              <Typography variant="h6" fontWeight="600" gutterBottom sx={{ 
+                              <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
                                 display: 'flex', 
                                 alignItems: 'center', 
-                                gap: 1,
+                                gap: 1.5,
                                 mb: 3,
-                                color: 'warning.dark'
+                                color: '#e65100'
                               }}>
-                                <PersonIcon /> Current Borrow Record
+                                <PersonIcon sx={{ color: '#ff9800', fontSize: 28 }} /> Current Borrow Record
                               </Typography>
                               
-                              <Grid container spacing={3}>
-                                <Grid item xs={12} md={6}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                    <PersonIcon sx={{ color: 'warning.main' }} />
+                              <Grid container spacing={2.5}>
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <PersonIcon sx={{ color: '#e65100', mt: 0.5 }} />
                                     <Box sx={{ flex: 1 }}>
-                                      <Typography variant="caption" color="text.secondary" display="block">
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                         Borrowed by
                                       </Typography>
-                                      <Typography variant="body1" fontWeight="500">
+                                      <Typography variant="body2" fontWeight="600">
                                         {selectedItem.currentBorrow.borrowedBy?.name || 'Unknown'}
                                       </Typography>
                                     </Box>
                                   </Box>
                                 </Grid>
                                 
-                                <Grid item xs={12} md={6}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                    <DateIcon sx={{ color: 'warning.main' }} />
+                                <Grid item xs={12} sm={6}>
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+                                    <DateIcon sx={{ color: '#e65100', mt: 0.5 }} />
                                     <Box sx={{ flex: 1 }}>
-                                      <Typography variant="caption" color="text.secondary" display="block">
+                                      <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 600, mb: 0.5 }}>
                                         Expected Return Date
                                       </Typography>
-                                      <Typography variant="body1" fontWeight="500">
+                                      <Typography variant="body2" fontWeight="600">
                                         {formatDate(selectedItem.currentBorrow.expected_return_date)}
                                       </Typography>
                                     </Box>
@@ -957,14 +1172,16 @@ const ItemsPage = () => {
                                 <Button
                                   fullWidth
                                   variant="contained"
-                                  color="success"
                                   startIcon={<ReturnIcon />}
                                   onClick={() => setReturnDialogOpen(true)}
                                   sx={{ 
                                     mt: 3,
-                                    borderRadius: 2,
+                                    borderRadius: 2.5,
                                     py: 1.5,
-                                    fontSize: '1rem'
+                                    fontSize: '0.95rem',
+                                    fontWeight: 700,
+                                    bgcolor: '#ff9800',
+                                    '&:hover': { bgcolor: '#e65100' }
                                   }}
                                 >
                                   Mark as Returned
@@ -977,22 +1194,38 @@ const ItemsPage = () => {
 
                       {/* QR Code Card */}
                       <Grid item xs={12}>
-                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                          <CardContent sx={{ textAlign: 'center' }}>
-                            <Typography variant="h6" fontWeight="600" gutterBottom sx={{ mb: 3 }}>
-                              <QrCodeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                        <Card sx={{ 
+                          borderRadius: 2.5,
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                            transition: 'all 0.3s'
+                          }
+                        }}>
+                          <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                            <Typography variant="h6" fontWeight="700" gutterBottom sx={{ 
+                              mb: 3,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 1.5,
+                              color: '#006400'
+                            }}>
+                              <QrCodeIcon sx={{ fontSize: 28, color: '#006400' }} />
                               Item QR Code
                             </Typography>
                             <Paper sx={{ 
-                              p: 4, 
+                              p: 3, 
                               display: 'inline-block', 
-                              borderRadius: 3,
-                              bgcolor: 'white',
+                              borderRadius: 2.5,
+                              bgcolor: '#fafaf8',
+                              border: '2px solid #e8e8e8',
                               boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                             }}>
                               <ItemQrCode value={selectedItem.qr_code} />
                             </Paper>
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 2 }}>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 2.5, fontWeight: 600 }}>
                               Scan this QR code to view item details
                             </Typography>
                           </CardContent>
@@ -1012,27 +1245,31 @@ const ItemsPage = () => {
               justifyContent: 'center',
               bgcolor: 'background.paper',
               borderRadius: 3,
-              m: 3
+              m: 3,
+              border: '2px dashed #d0d0d0',
+              py: 6
             }}>
               <Box sx={{ 
                 width: 120, 
                 height: 120, 
                 borderRadius: '50%', 
-                bgcolor: 'primary.50',
+                bgcolor: '#f0f7f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                mb: 3
+                mb: 4,
+                boxShadow: '0 4px 12px rgba(0, 100, 0, 0.08)'
               }}>
-                <InventoryIcon sx={{ fontSize: 64, color: 'primary.main', opacity: 0.7 }} />
+                <InventoryIcon sx={{ fontSize: 64, color: '#006400', opacity: 0.8 }} />
               </Box>
-              <Typography variant="h4" color="text.secondary" gutterBottom fontWeight="600">
+              <Typography variant="h4" color="text.primary" gutterBottom fontWeight="700" sx={{ color: '#006400' }}>
                 No Item Selected
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ 
                 textAlign: 'center', 
                 maxWidth: 400,
-                mb: 4
+                mb: 4,
+                lineHeight: 1.8
               }}>
                 Select an item from the list to view detailed information, purchase details, and QR code.
               </Typography>
@@ -1040,7 +1277,14 @@ const ItemsPage = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setDialogOpen(true)}
-                sx={{ borderRadius: 2, px: 4, py: 1.5 }}
+                sx={{ 
+                  borderRadius: 2.5, 
+                  px: 4, 
+                  py: 1.5,
+                  fontWeight: 700,
+                  bgcolor: '#006400',
+                  '&:hover': { bgcolor: '#004d00' }
+                }}
               >
                 Create New Item
               </Button>
@@ -1065,11 +1309,11 @@ const ItemsPage = () => {
         fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}
       >
-        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
-          <Typography variant="h5" fontWeight="700">
+        <DialogTitle sx={{ borderBottom: 1, borderColor: '#e8e8e8', pb: 2.5, pt: 3 }}>
+          <Typography variant="h5" fontWeight="800" sx={{ color: '#006400', mb: 0.5 }}>
             {editing ? 'Edit Item' : 'Add New Item'}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
             {editing ? 'Update the item details below' : 'Fill in the details to add a new item'}
           </Typography>
         </DialogTitle>
@@ -1124,6 +1368,23 @@ const ItemsPage = () => {
                   {categories.map(cat => (
                     <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
                   ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Fund Cluster"
+                  value={newItem.fund_cluster}
+                  onChange={e => setNewItem({ ...newItem, fund_cluster: e.target.value })}
+                  required
+                  variant="outlined"
+                  size="small"
+                >
+                  <MenuItem value="General Trust Fund">General Trust Fund</MenuItem>
+                  <MenuItem value="Special Trust Fund">Special Trust Fund</MenuItem>
+                  <MenuItem value="TEF Trust Fund">TEF Trust Fund</MenuItem>
+                  <MenuItem value="MDS/RAF">MDS/RAF</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1247,25 +1508,39 @@ const ItemsPage = () => {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
+          <DialogActions sx={{ p: 3, borderTop: 1, borderColor: '#e8e8e8', gap: 1.5 }}>
             <Button 
               onClick={() => {
                 setDialogOpen(false);
                 setEditing(null);
                 setNewItem({
-                  name: "", description: "", category_id: "", office_id: "", status: "Available",
+                  name: "", description: "", category_id: "", fund_cluster: "General Trust Fund", office_id: "", status: "Available",
                   serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "",
                   last_condition_check: ""
                 });
               }}
-              sx={{ borderRadius: 2, px: 3 }}
+              sx={{ 
+                borderRadius: 2.5, 
+                px: 3,
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                fontWeight: 600
+              }}
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               variant="contained"
-              sx={{ borderRadius: 2, px: 4 }}
+              sx={{ 
+                borderRadius: 2.5, 
+                px: 4,
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                bgcolor: '#006400',
+                '&:hover': { bgcolor: '#004d00' }
+              }}
             >
               {editing ? 'Update Item' : 'Create Item'}
             </Button>

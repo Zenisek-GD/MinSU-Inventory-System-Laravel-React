@@ -37,9 +37,11 @@ import {
   ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { Scanner } from '@yudiel/react-qr-scanner';
+// Keep results inline on this page to ensure immediate display
 import jsQR from 'jsqr';
 import DashboardLayout from '../components/Layout/DashboardLayout';
 import { fetchItemByQr, updateItemStatus } from '../api/item';
+import { parseQr } from '../shared/qr';
 import { useUser } from '../context/UserContext';
 
 const QRScanner = () => {
@@ -69,13 +71,18 @@ const QRScanner = () => {
 
     try {
       console.log('[QRScanner] Scanning QR code:', cleanedCode);
-      const response = await fetchItemByQr(cleanedCode);
+      const parsed = parseQr(cleanedCode);
+      const qrValue = parsed?.qr || cleanedCode;
+      const response = await fetchItemByQr(qrValue);
       console.log('[QRScanner] Item found:', response);
       setScannedItem(response);
       setInfo('Item found successfully!');
     } catch (error) {
       console.error('[QRScanner] Error fetching item:', error);
-      setError(`Item not found. Please try a different QR code.`);
+      const msg = (error?.response?.status === 401)
+        ? 'Unauthorized. Please log in first.'
+        : 'Item not found or unreachable. Please verify the QR value and backend.';
+      setError(msg);
       setScannedItem(null);
     } finally {
       setLoading(false);
@@ -587,6 +594,24 @@ const QRScanner = () => {
                         </Grid>
                       )}
 
+                      {/* Assigned To */}
+                      {scannedItem.assigned_user && (
+                        <Grid item xs={12}>
+                          <Alert 
+                            severity="info"
+                            icon={<InfoIcon />}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                              Assigned To
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>User:</strong> {scannedItem.assigned_user.name}
+                            </Typography>
+                          </Alert>
+                        </Grid>
+                      )}
+
                       {/* Borrow Status */}
                       {scannedItem.current_borrow && (
                         <Grid item xs={12}>
@@ -599,8 +624,8 @@ const QRScanner = () => {
                               Currently Borrowed
                             </Typography>
                             <Typography variant="body2">
-                              <strong>By:</strong> {scannedItem.current_borrow.borrowed_by?.name || 'Unknown'}<br />
-                              <strong>Since:</strong> {new Date(scannedItem.current_borrow.borrow_date).toLocaleDateString()}<br />
+                              <strong>By:</strong> {scannedItem.current_borrow.borrowedBy?.name || 'Unknown'}<br />
+                              <strong>Since:</strong> {new Date(scannedItem.current_borrow.borrowed_at).toLocaleDateString()}<br />
                               <strong>Expected Return:</strong> {new Date(scannedItem.current_borrow.expected_return_date).toLocaleDateString()}
                             </Typography>
                           </Alert>

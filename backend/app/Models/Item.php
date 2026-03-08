@@ -13,16 +13,20 @@ class Item extends Model
         'name',
         'description',
         'category_id',
+        'fund_cluster',
         'qr_code',
         'serial_number',
         'condition',
         'status',
         'office_id',
+        'assigned_to',
         'purchase_date',
         'purchase_price',
         'reorder_level',
         'safety_stock',
         'unit',
+        'stock',
+        'item_type',
         'warranty_expiry',
         'notes',
         'last_condition_check'
@@ -46,6 +50,11 @@ class Item extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function assignedUser()
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
     public function borrowRecords()
     {
         return $this->hasMany(BorrowRecord::class);
@@ -54,6 +63,23 @@ class Item extends Model
     public function conditionAudits()
     {
         return $this->hasMany(ConditionAudit::class);
+    }
+
+    public function mrItems()
+    {
+        return $this->hasMany(MRItem::class, 'item_id');
+    }
+
+    public function memorandumReceipts()
+    {
+        return $this->hasManyThrough(
+            MemorandumReceipt::class,
+            MRItem::class,
+            'item_id',
+            'id',
+            'id',
+            'mr_id'
+        );
     }
 
     // Scopes
@@ -116,6 +142,31 @@ class Item extends Model
     public function needsRepair()
     {
         return in_array($this->condition, ['Needs Repair', 'Damaged']);
+    }
+
+    /**
+     * Get the current active Memorandum Receipt if this item is tracked
+     */
+    public function getCurrentMemorandumReceipt()
+    {
+        return $this->mrItems()
+            ->whereHas('memorandumReceipt', function ($query) {
+                $query->whereIn('status', ['Pending Signature', 'Approved', 'Released']);
+            })
+            ->with('memorandumReceipt')
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Get all Memorandum Receipts this item has been on
+     */
+    public function getMRHistory()
+    {
+        return $this->mrItems()
+            ->with('memorandumReceipt')
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     public function getWarrantyStatusAttribute()

@@ -24,10 +24,10 @@ class AuthController extends Controller
             $validated = $request->validated();
 
             $user = User::create([
-                'name'      => $validated['name'],
-                'email'     => $validated['email'],
-                'password'  => Hash::make($validated['password']),
-                'role'      => $validated['role'] ?? 'staff',
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => $validated['role'] ?? 'staff',
                 'office_id' => $validated['office_id'] ?? null,
             ]);
 
@@ -49,10 +49,22 @@ class AuthController extends Controller
         try {
             $credentials = $request->validated();
 
-            if (!Auth::attempt([
-                'email'    => $credentials['email'],
-                'password' => $credentials['password']
-            ])) {
+            \Log::info('Login attempt', ['email' => $credentials['email']]);
+
+            // Check if user exists first
+            $user = User::where('email', $credentials['email'])->first();
+            if (!$user) {
+                \Log::warning('Login failed: user not found', ['email' => $credentials['email']]);
+                return $this->error('Invalid email or password', 401);
+            }
+
+            if (
+                !Auth::attempt([
+                    'email' => $credentials['email'],
+                    'password' => $credentials['password']
+                ])
+            ) {
+                \Log::warning('Login failed: invalid password', ['email' => $credentials['email']]);
                 return $this->error('Invalid email or password', 401);
             }
 
@@ -60,12 +72,15 @@ class AuthController extends Controller
 
             $user = Auth::user()->load('office');
 
+            \Log::info('Login successful', ['user_id' => $user->id, 'email' => $user->email]);
+
             return $this->ok('Login successful', [
                 'user' => $user,
                 'role' => $user->role,
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Login error', ['error' => $e->getMessage()]);
             return $this->error('Login failed: ' . $e->getMessage(), 500);
         }
     }
@@ -85,11 +100,13 @@ class AuthController extends Controller
 
     public function roleCounts()
     {
-        return [
-            'admin'           => User::where('role', 'admin')->count(),
-            'supply_officer'  => User::where('role', 'supply_officer')->count(),
-            'staff'           => User::where('role', 'staff')->count(),
-        ];
+        $counts = User::groupBy('role')->selectRaw('role, COUNT(*) as count')->pluck('count', 'role');
+
+        return response()->json([
+            'admin' => $counts->get('admin', 0),
+            'supply_officer' => $counts->get('supply_officer', 0),
+            'staff' => $counts->get('staff', 0),
+        ]);
     }
 
     /**
@@ -113,7 +130,7 @@ class AuthController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'name'  => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
         ]);
 
@@ -131,7 +148,7 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'current_password' => 'required|string',
-            'password'         => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
         $user = Auth::user();

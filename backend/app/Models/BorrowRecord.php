@@ -82,6 +82,11 @@ class BorrowRecord extends Model
 
         // Update item status
         $this->item->update(['status' => 'Borrowed']);
+
+        // Decrement stock when approved
+        if ($this->item->stock > 0) {
+            $this->item->decrement('stock');
+        }
     }
 
     public function reject()
@@ -107,6 +112,9 @@ class BorrowRecord extends Model
             'status' => 'Available',
             'condition' => $conditionAfter,
         ]);
+
+        // Increment stock when returned
+        $this->item->increment('stock');
     }
 
     public function markAsLost()
@@ -140,5 +148,36 @@ class BorrowRecord extends Model
     public function getCanBeApprovedAttribute()
     {
         return $this->status === 'Pending';
+    }
+
+    /**
+     * Check if borrowing this item violates consumable restrictions
+     * Consumables can only be borrowed in bulk units (reams, pairs, bundles, boxes, kits)
+     */
+    public function isConsumableViolation(): bool
+    {
+        if (!$this->item) {
+            return false;
+        }
+
+        // Consumable items can only be borrowed in bulk units
+        if ($this->item->item_type === 'consumable') {
+            $validConsumableUnits = ['reams', 'pairs', 'bundles', 'boxes', 'kits', 'sets', 'liters', 'kg', 'meters'];
+            return !in_array(strtolower($this->item->unit), $validConsumableUnits);
+        }
+
+        return false;
+    }
+
+    /**
+     * Get consumable restriction message
+     */
+    public function getConsumableRestrictionMessage(): string
+    {
+        if ($this->isConsumableViolation()) {
+            return "Consumable items can only be borrowed in bulk units (reams, pairs, bundles, boxes, kits, sets, liters, kg, meters). This item is measured in: {$this->item->unit}";
+        }
+
+        return '';
     }
 }

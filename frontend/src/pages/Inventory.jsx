@@ -42,6 +42,7 @@ import {
   Refresh,
   FilterList,
   GetApp,
+  QrCode as QrCodeIcon,
 } from "@mui/icons-material";
 
 const InventoryPage = () => {
@@ -386,31 +387,49 @@ const InventoryPage = () => {
             </Grid>
 
             {/* Filters */}
-            <Card sx={{ mb: 3 }}>
+            <Card sx={{ 
+              mb: 3,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              borderRadius: 2,
+              border: '1px solid #f0f0f0'
+            }}>
               <CardContent>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <FilterList sx={{ mr: 1, color: "#006400" }} />
-                  <Typography variant="h6" sx={{ fontWeight: "bold", color: "#006400" }}>
-                    Filters
+                  <FilterList sx={{ mr: 1.5, color: "#006400", fontSize: 24 }} />
+                  <Typography variant="h6" sx={{ fontWeight: "700", color: "#006400" }}>
+                    Filters & Search
                   </Typography>
-                  <Button size="small" onClick={resetFilters} sx={{ ml: "auto" }}>
-                    Reset
+                  <Button 
+                    size="small" 
+                    onClick={resetFilters} 
+                    sx={{ ml: "auto", textTransform: "none" }}
+                    variant="outlined"
+                  >
+                    Reset All
                   </Button>
                 </Box>
+                <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6} md={3}>
                     <TextField
                       fullWidth
                       size="small"
-                      label="Search"
+                      label="Search items..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Search />
+                            <Search sx={{ color: "text.secondary" }} />
                           </InputAdornment>
                         ),
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 1.5,
+                          backgroundColor: '#fafafa',
+                          '&:hover': { backgroundColor: '#f5f5f5' }
+                        }
                       }}
                     />
                   </Grid>
@@ -421,6 +440,11 @@ const InventoryPage = () => {
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
                         label="Category"
+                        sx={{
+                          borderRadius: 1.5,
+                          backgroundColor: '#fafafa',
+                          '&:hover': { backgroundColor: '#f5f5f5' }
+                        }}
                       >
                         <MenuItem value="all">All Categories</MenuItem>
                         {categories.map(cat => (
@@ -436,6 +460,11 @@ const InventoryPage = () => {
                         value={selectedOffice}
                         onChange={(e) => setSelectedOffice(e.target.value)}
                         label="Office"
+                        sx={{
+                          borderRadius: 1.5,
+                          backgroundColor: '#fafafa',
+                          '&:hover': { backgroundColor: '#f5f5f5' }
+                        }}
                       >
                         <MenuItem value="all">All Offices</MenuItem>
                         {offices.map(office => (
@@ -451,6 +480,11 @@ const InventoryPage = () => {
                         value={selectedStatus}
                         onChange={(e) => setSelectedStatus(e.target.value)}
                         label="Status"
+                        sx={{
+                          borderRadius: 1.5,
+                          backgroundColor: '#fafafa',
+                          '&:hover': { backgroundColor: '#f5f5f5' }
+                        }}
                       >
                         <MenuItem value="all">All Status</MenuItem>
                         <MenuItem value="available">Available</MenuItem>
@@ -465,75 +499,239 @@ const InventoryPage = () => {
             </Card>
 
             {/* Items Table */}
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", color: "#006400" }}>
-                  Inventory Items ({filteredItems.length})
-                </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table>
-                    <TableHead sx={{ bgcolor: "#f5f5f5" }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => handleSort("name")}>
-                          Name {sortBy === "name" && (sortOrder === "asc" ? "↑" : "↓")}
+            <Card sx={{ 
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              borderRadius: 2,
+              border: '1px solid #f0f0f0',
+              overflow: 'hidden'
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ p: 2, pb: 0 }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: "700", color: "#006400", display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Inventory sx={{ color: '#006400' }} />
+                    Inventory Items
+                    <Chip 
+                      label={filteredItems.length}
+                      size="small"
+                      sx={{ 
+                        ml: 'auto',
+                        bgcolor: 'rgba(0, 100, 0, 0.1)',
+                        color: '#006400',
+                        fontWeight: 700
+                      }}
+                    />
+                  </Typography>
+                </Box>
+                <TableContainer sx={{ maxHeight: 'calc(100vh - 500px)' }}>
+                  <Table stickyHeader size="small" sx={{ '& thead th': { fontWeight: 700 } }}>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            cursor: "pointer", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            userSelect: 'none',
+                            width: '25%',
+                            '&:hover': { bgcolor: '#e8f5e9' }
+                          }} 
+                          onClick={() => handleSort("name")}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <span>Item Name</span>
+                            {sortBy === "name" && (
+                              <Box component="span" sx={{ fontSize: '0.75rem' }}>{sortOrder === "asc" ? "↑" : "↓"}</Box>
+                            )}
+                          </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontWeight: "bold" }}>QR Code</TableCell>
-                        <TableCell sx={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => handleSort("category_id")}>
-                          Category {sortBy === "category_id" && (sortOrder === "asc" ? "↑" : "↓")}
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            cursor: "pointer", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            userSelect: 'none',
+                            width: '20%',
+                            '&:hover': { bgcolor: '#e8f5e9' }
+                          }} 
+                          onClick={() => handleSort("category_id")}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <span>Category</span>
+                            {sortBy === "category_id" && (
+                              <Box component="span" sx={{ fontSize: '0.75rem' }}>{sortOrder === "asc" ? "↑" : "↓"}</Box>
+                            )}
+                          </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => handleSort("office_id")}>
-                          Office {sortBy === "office_id" && (sortOrder === "asc" ? "↑" : "↓")}
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            cursor: "pointer", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            userSelect: 'none',
+                            width: '18%',
+                            '&:hover': { bgcolor: '#e8f5e9' }
+                          }} 
+                          onClick={() => handleSort("office_id")}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <span>Office</span>
+                            {sortBy === "office_id" && (
+                              <Box component="span" sx={{ fontSize: '0.75rem' }}>{sortOrder === "asc" ? "↑" : "↓"}</Box>
+                            )}
+                          </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => handleSort("status")}>
-                          Status {sortBy === "status" && (sortOrder === "asc" ? "↑" : "↓")}
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            cursor: "pointer", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            userSelect: 'none',
+                            width: '15%',
+                            '&:hover': { bgcolor: '#e8f5e9' }
+                          }} 
+                          onClick={() => handleSort("status")}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <span>Status</span>
+                            {sortBy === "status" && (
+                              <Box component="span" sx={{ fontSize: '0.75rem' }}>{sortOrder === "asc" ? "↑" : "↓"}</Box>
+                            )}
+                          </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => handleSort("quantity")}>
-                          Quantity {sortBy === "quantity" && (sortOrder === "asc" ? "↑" : "↓")}
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            cursor: "pointer", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            userSelect: 'none',
+                            width: '10%',
+                            '&:hover': { bgcolor: '#e8f5e9' }
+                          }} 
+                          onClick={() => handleSort("quantity")}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <span>Qty</span>
+                            {sortBy === "quantity" && (
+                              <Box component="span" sx={{ fontSize: '0.75rem' }}>{sortOrder === "asc" ? "↑" : "↓"}</Box>
+                            )}
+                          </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontWeight: "bold" }}>Description</TableCell>
+                        <TableCell 
+                          sx={{ 
+                            fontWeight: "700", 
+                            bgcolor: '#f5f5f5',
+                            color: '#006400',
+                            fontSize: '0.9rem',
+                            padding: '12px 14px !important',
+                            width: '12%',
+                            textAlign: 'center'
+                          }}
+                        >
+                          Actions
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {paginatedItems.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                            <Typography color="text.secondary">No items found</Typography>
+                          <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <Inventory sx={{ fontSize: 48, color: 'text.disabled' }} />
+                              <Typography color="text.secondary" variant="body1">
+                                No items found
+                              </Typography>
+                              <Typography color="text.disabled" variant="caption">
+                                Try adjusting your filters
+                              </Typography>
+                            </Box>
                           </TableCell>
                         </TableRow>
                       ) : (
-                        paginatedItems.map((item) => (
-                          <TableRow key={item.id} hover>
-                            <TableCell sx={{ fontWeight: "medium" }}>{item.name}</TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                                {item.qr_code || "-"}
-                              </Typography>
+                        paginatedItems.map((item, idx) => (
+                          <TableRow 
+                            key={item.id} 
+                            sx={{ 
+                              backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9',
+                              '&:hover': { 
+                                backgroundColor: '#f0f8f0',
+                                transition: 'background-color 0.15s'
+                              },
+                              borderBottom: '1px solid #e8e8e8'
+                            }}
+                          >
+                            <TableCell sx={{ fontWeight: "600", color: '#006400', padding: '11px 14px !important', fontSize: '0.9rem' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Inventory sx={{ fontSize: 18, color: 'text.disabled' }} />
+                                {item.name}
+                              </Box>
                             </TableCell>
-                            <TableCell>
-                              {categories.find(c => c.id === item.category_id)?.name || "-"}
-                            </TableCell>
-                            <TableCell>
-                              {offices.find(o => o.id === item.office_id)?.name || "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={item.status}
-                                color={getStatusColor(item.status)}
+                            <TableCell sx={{ padding: '11px 14px !important', fontSize: '0.9rem' }}>
+                              <Chip 
+                                label={categories.find(c => c.id === item.category_id)?.name || "-"}
                                 size="small"
-                                icon={getStatusIcon(item.status)}
+                                variant="outlined"
+                                sx={{
+                                  borderColor: '#006400',
+                                  color: '#006400',
+                                  fontWeight: 600,
+                                  backgroundColor: 'rgba(0, 100, 0, 0.05)'
+                                }}
                               />
                             </TableCell>
-                            <TableCell>
+                            <TableCell sx={{ padding: '11px 14px !important', fontSize: '0.9rem' }}>
+                              <Typography variant="body2">
+                                {offices.find(o => o.id === item.office_id)?.name || "-"}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ padding: '11px 14px !important', fontSize: '0.9rem' }}>
+                              <Chip
+                                label={item.status}
+                                color={
+                                  item.status?.toLowerCase() === 'available' ? 'success' :
+                                  item.status?.toLowerCase() === 'borrowed' ? 'warning' :
+                                  item.status?.toLowerCase() === 'damaged' ? 'error' :
+                                  'default'
+                                }
+                                size="small"
+                                variant="filled"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ padding: '11px 14px !important', fontSize: '0.9rem', textAlign: 'center' }}>
                               <Chip
                                 label={item.quantity || 0}
                                 size="small"
-                                color={(item.quantity || 0) < 5 ? "error" : "default"}
+                                sx={{
+                                  backgroundColor: (item.quantity || 0) < 5 ? '#ffebee' : '#e8f5e9',
+                                  color: (item.quantity || 0) < 5 ? '#c62828' : '#2e7d32',
+                                  fontWeight: 700
+                                }}
                               />
                             </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
-                                {item.description || "-"}
-                              </Typography>
+                            <TableCell sx={{ padding: '11px 14px !important', textAlign: 'center' }}>
+                              <Tooltip title="View QR Code">
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ color: '#006400', '&:hover': { bgcolor: 'rgba(0, 100, 0, 0.1)' } }}
+                                >
+                                  <QrCodeIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </Tooltip>
                             </TableCell>
                           </TableRow>
                         ))
@@ -549,6 +747,10 @@ const InventoryPage = () => {
                   rowsPerPage={rowsPerPage}
                   onRowsPerPageChange={handleChangeRowsPerPage}
                   rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                  sx={{
+                    borderTop: '1px solid #f0f0f0',
+                    '& .MuiTablePagination-root': { p: 2 }
+                  }}
                 />
               </CardContent>
             </Card>

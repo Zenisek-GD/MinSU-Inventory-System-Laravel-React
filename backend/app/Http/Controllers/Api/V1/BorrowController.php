@@ -27,7 +27,7 @@ class BorrowController extends Controller
             $query->where('borrowed_by', $request->user_id);
         }
 
-        $borrowRecords = $query->latest()->get();
+        $borrowRecords = $query->latest()->paginate(50);
 
         return response()->json($borrowRecords);
     }
@@ -64,6 +64,14 @@ class BorrowController extends Controller
             if (in_array($item->condition, ['Damaged', 'Disposed'])) {
                 return response()->json([
                     'message' => 'Item cannot be borrowed in its current condition'
+                ], 422);
+            }
+
+            // Validate consumable restrictions
+            $consumableUnits = ['reams', 'pairs', 'bundles', 'boxes', 'kits', 'sets', 'liters', 'kg', 'meters'];
+            if ($item->item_type === 'consumable' && !in_array(strtolower($item->unit), $consumableUnits)) {
+                return response()->json([
+                    'message' => 'Consumable items can only be borrowed in bulk units (reams, pairs, bundles, boxes, kits, sets, liters, kg, meters)',
                 ], 422);
             }
 
@@ -188,8 +196,10 @@ class BorrowController extends Controller
             // Update item status
             $item->update(['status' => 'Borrowed']);
 
-            // Note: Borrowing doesn't change stock quantity, just tracks temporary assignment
-            // Stock movements are only for: purchase, transfer, adjustment, damage, disposal
+            // Decrement stock when approved (if stock tracking is enabled)
+            if ($item->stock > 0) {
+                $item->decrement('stock');
+            }
 
             DB::commit();
 
@@ -274,6 +284,9 @@ class BorrowController extends Controller
                 'status' => 'Available',
                 'condition' => $request->condition_after
             ]);
+
+            // Increment stock when item is returned
+            $borrowRecord->item->increment('stock');
 
             // Auto-create damage movement if item returned in worse condition
             if (

@@ -4,6 +4,8 @@ import { fetchItems } from "../api/item";
 import { fetchCategories } from "../api/category";
 import { fetchStockMovements } from "../api/stockMovement";
 import { fetchOffices } from "../api/office";
+import { fetchUsers } from "../api/user";
+import api from "../api/axios";
 import {
   Box,
   Grid,
@@ -49,7 +51,9 @@ import {
   Download,
   Print,
   ContentCopy,
-  ZoomIn,
+  Edit as EditIcon,
+  Send as TransferIcon,
+  DeleteOutline as DeleteIcon,
 } from "@mui/icons-material";
 import QRCode from "react-qr-code";
 
@@ -58,6 +62,7 @@ export default function ItemsInventoryPage() {
   const [categories, setCategories] = useState([]);
   const [movements, setMovements] = useState([]);
   const [offices, setOffices] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refresh, setRefresh] = useState(false);
@@ -70,21 +75,26 @@ export default function ItemsInventoryPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [transferItem, setTransferItem] = useState(null);
   const [mutating, setMutating] = useState(false);
+  const [transferUserId, setTransferUserId] = useState("");
 
   // form state
   const [form, setForm] = useState({
     name: "",
     description: "",
     category_id: "",
-    status: "Available",
+    fund_cluster: "General Trust Fund",
+    condition: "Good",
     serial_number: "",
     office_id: "",
+    purchase_date: "",
+    purchase_price: "",
+    warranty_expiry: "",
+    notes: "",
   });
-  const [transferOfficeId, setTransferOfficeId] = useState("");
-
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("all");
   const [status, setStatus] = useState("all");
+  // Remove old transferOfficeId state - handled by transferUserId now
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -103,12 +113,16 @@ export default function ItemsInventoryPage() {
         setItems(itemData?.data?.data || itemData?.data || itemData || []);
         setCategories(catData?.data?.data || catData?.data || catData || []);
         setMovements(movData?.data?.data || movData?.data || movData || []);
-        // offices
+        // offices and users
         try {
-          const officeData = await fetchOffices();
+          const [officeData, userData] = await Promise.all([
+            fetchOffices(),
+            fetchUsers(),
+          ]);
           setOffices(officeData?.data?.data || officeData?.data || officeData || []);
+          setUsers(userData?.data?.data || userData?.data || userData || []);
         } catch (e) {
-          // silently ignore office load errors
+          // silently ignore office/user load errors
         }
       } catch (e) {
         setError("Failed to load items. Please try again.");
@@ -171,6 +185,15 @@ export default function ItemsInventoryPage() {
     return "default";
   };
 
+  const getFundClusterColor = (fund) => {
+    const f = (fund || "General Trust Fund").toLowerCase();
+    if (f.includes("general")) return "#2196F3"; // Blue
+    if (f.includes("special")) return "#4CAF50"; // Green
+    if (f.includes("tef")) return "#FF9800"; // Orange
+    if (f.includes("mds") || f.includes("raf")) return "#9C27B0"; // Purple
+    return "#757575"; // Grey
+  };
+
   const handleQrClick = (item, e) => {
     e.stopPropagation();
     if (item.qr_code) {
@@ -178,46 +201,35 @@ export default function ItemsInventoryPage() {
         code: item.qr_code,
         name: item.name,
         serial: item.serial_number,
-        category: categories.find(c => c.id === item.category_id)?.name
+        category: categories.find(c => c.id === item.category_id)?.name,
+        currentBorrow: item.current_borrow || item.currentBorrow,
+        assigned_user: item.assigned_user
       });
       setQrModalOpen(true);
     }
   };
 
   // Helpers: API calls for mutations
-  const apiBase = "/api/v1";
   const createItem = async (payload) => {
-    return fetch(`${apiBase}/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(r => r.json());
+    const response = await api.post("/items", payload);
+    return response.data;
   };
   const updateItem = async (id, payload) => {
-    return fetch(`${apiBase}/items/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(r => r.json());
+    const response = await api.put(`/items/${id}`, payload);
+    return response.data;
   };
   const archiveItem = async (id) => {
-    return fetch(`${apiBase}/items/${id}/archive`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "Archived via Items & Inventory" }),
-    }).then(r => r.json());
+    const response = await api.post(`/items/${id}/archive`, { reason: "Archived via Items & Inventory" });
+    return response.data;
   };
-  const transferItemApi = async (id, office_id) => {
-    return fetch(`${apiBase}/items/${id}/transfer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ office_id }),
-    }).then(r => r.json());
+  const transferItemApi = async (id, assigned_to) => {
+    const response = await api.post(`/items/${id}/transfer`, { assigned_to });
+    return response.data;
   };
 
   // Open dialogs
   const openAdd = () => {
-    setForm({ name: "", description: "", category_id: "", status: "Available", serial_number: "", office_id: "" });
+    setForm({ name: "", description: "", category_id: "", condition: "Good", serial_number: "", office_id: "", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "" });
     setAddOpen(true);
   };
   const openEdit = (item) => {
@@ -226,15 +238,19 @@ export default function ItemsInventoryPage() {
       name: item.name || "",
       description: item.description || "",
       category_id: item.category_id || "",
-      status: item.status || "Available",
+      condition: item.condition || "Good",
       serial_number: item.serial_number || "",
       office_id: item.office_id || item.office?.id || "",
+      purchase_date: item.purchase_date || "",
+      purchase_price: item.purchase_price || "",
+      warranty_expiry: item.warranty_expiry || "",
+      notes: item.notes || "",
     });
     setEditOpen(true);
   };
   const openTransfer = (item) => {
     setTransferItem(item);
-    setTransferOfficeId("");
+    setTransferUserId("");
     setTransferOpen(true);
   };
 
@@ -242,11 +258,17 @@ export default function ItemsInventoryPage() {
   const submitAdd = async () => {
     setMutating(true);
     try {
-      await createItem({ ...form });
+      const payload = { ...form };
+      // Remove empty string values but keep 0 and false
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === "") payload[key] = null;
+      });
+      await createItem(payload);
       setAddOpen(false);
       setRefresh(r => !r);
     } catch (e) {
       setError("Failed to add item.");
+      console.error("Add item error:", e);
     } finally {
       setMutating(false);
     }
@@ -255,12 +277,18 @@ export default function ItemsInventoryPage() {
     if (!editingItem) return;
     setMutating(true);
     try {
-      await updateItem(editingItem.id, { ...form });
+      const payload = { ...form };
+      // Remove empty string values but keep 0 and false
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === "") payload[key] = null;
+      });
+      await updateItem(editingItem.id, payload);
       setEditOpen(false);
       setEditingItem(null);
       setRefresh(r => !r);
     } catch (e) {
       setError("Failed to update item.");
+      console.error("Update item error:", e);
     } finally {
       setMutating(false);
     }
@@ -279,10 +307,10 @@ export default function ItemsInventoryPage() {
     }
   };
   const submitTransfer = async () => {
-    if (!transferItem || !transferOfficeId) return;
+    if (!transferItem || !transferUserId) return;
     setMutating(true);
     try {
-      await transferItemApi(transferItem.id, parseInt(transferOfficeId));
+      await transferItemApi(transferItem.id, parseInt(transferUserId));
       setTransferOpen(false);
       setTransferItem(null);
       setRefresh(r => !r);
@@ -513,127 +541,149 @@ export default function ItemsInventoryPage() {
             </Box>
           ) : (
             <>
-              <Table>
-                <TableHead sx={{ bgcolor: 'primary.lighter' }}>
+              <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Item Details</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Location</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>QR Code</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '20%', padding: '12px 10px' }}>Item</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '12%', padding: '12px 10px' }}>Category</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '12%', padding: '12px 10px' }}>Fund</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '10%', padding: '12px 10px' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '12%', padding: '12px 10px' }}>Location</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '12%', padding: '12px 10px' }}>Assigned</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '10%', padding: '12px 10px' }}>Borrowed</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#006400', width: '12%', padding: '12px 10px', textAlign: 'center' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {paged.map(item => (
+                  {paged.map((item, idx) => (
                     <TableRow 
                       key={item.id} 
                       hover 
                       sx={{ 
                         cursor: "pointer",
-                        '&:hover': { bgcolor: 'action.hover' }
+                        backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9',
+                        '&:hover': { bgcolor: '#f0f8f0', transition: 'background-color 0.15s' }
                       }}
                       onClick={() => handleRowClick(item)}
                     >
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px' }}>
                         <Box>
-                          <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+                          <Typography fontWeight={600} sx={{ mb: 0.25, fontSize: '0.9rem' }}>
                             {item.name}
                           </Typography>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            {item.serial_number && (
-                              <Chip 
-                                size="small" 
-                                label={`SN: ${item.serial_number}`} 
-                                variant="outlined" 
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-                            )}
-                          </Stack>
-                          {item.description && (
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                              {item.description.length > 60 ? `${item.description.substring(0, 60)}...` : item.description}
-                            </Typography>
+                          {item.serial_number && (
+                            <Chip 
+                              size="small" 
+                              label={`SN: ${item.serial_number}`} 
+                              variant="outlined" 
+                              sx={{ fontSize: '0.65rem' }}
+                            />
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px' }}>
                         <Chip 
                           size="small" 
-                          icon={<CategoryIcon sx={{ fontSize: 16 }} />} 
+                          icon={<CategoryIcon sx={{ fontSize: 14 }} />} 
                           label={categories.find(c => c.id === item.category_id)?.name || "-"}
                           variant="outlined"
                           sx={{ fontSize: '0.75rem' }}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ padding: '10px' }}>
+                        <Chip 
+                          size="small"
+                          label={item.fund_cluster?.substring(0, 10) || "GTF"}
+                          variant="filled"
+                          sx={{ 
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            bgcolor: getFundClusterColor(item.fund_cluster),
+                            color: '#fff'
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ padding: '10px' }}>
                         <Chip 
                           size="small" 
                           label={item.status || "-"}
                           color={getStatusColor(item.status)}
                           sx={{ 
                             fontWeight: 600,
-                            fontSize: '0.75rem',
-                            minWidth: 100
+                            fontSize: '0.75rem'
                           }}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">
-                            {item.office?.name || item.office_name || "Unassigned"}
+                      <TableCell sx={{ padding: '10px' }}>
+                        <Stack direction="row" alignItems="center" spacing={0.25}>
+                          <LocationOn sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          <Typography variant="caption" sx={{ fontSize: '0.8rem' }}>
+                            {(item.office?.name || item.office_name || "Unassigned").substring(0, 15)}
                           </Typography>
                         </Stack>
                       </TableCell>
-                      <TableCell>
-                        {item.qr_code ? (
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Tooltip title="View/Print QR Code">
-                              <Chip 
-                                size="small"
-                                icon={<QrCodeIcon sx={{ fontSize: 16 }} />}
-                                label={item.qr_code}
-                                variant="outlined"
-                                sx={{ fontFamily: 'monospace', fontSize: '0.75rem', cursor: 'pointer' }}
-                                onClick={(e) => handleQrClick(item, e)}
-                              />
-                            </Tooltip>
-                            <Tooltip title="Zoom QR">
-                              <IconButton 
-                                size="small" 
-                                onClick={(e) => handleQrClick(item, e)}
-                                sx={{ color: 'primary.main' }}
-                              >
-                                <ZoomIn fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
+                      <TableCell sx={{ padding: '10px' }}>
+                        {item.currentMR ? (
+                          <Chip 
+                            size="small" 
+                            label={item.currentMR.mr_number.substring(0, 12)}
+                            variant="filled"
+                            sx={{ 
+                              fontWeight: 600,
+                              fontSize: '0.7rem',
+                              bgcolor: 'success.light',
+                              color: 'success.dark'
+                            }}
+                          />
+                        ) : item.assigned_user ? (
+                          <Chip 
+                            size="small" 
+                            label={item.assigned_user.name.substring(0, 12)}
+                            variant="filled"
+                            sx={{ 
+                              fontWeight: 600,
+                              fontSize: '0.7rem',
+                              bgcolor: 'info.light',
+                              color: 'info.dark'
+                            }}
+                          />
                         ) : (
-                          <Typography variant="caption" color="text.secondary">No QR</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>-</Typography>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1}>
+                      <TableCell sx={{ padding: '10px' }}>
+                        {item.currentBorrow ? (
+                          <Chip 
+                            size="small" 
+                            label={item.currentBorrow.borrowedBy?.name?.substring(0, 12) || "Borrowed"}
+                            variant="filled"
+                            sx={{ 
+                              fontWeight: 600,
+                              fontSize: '0.7rem',
+                              bgcolor: 'warning.light',
+                              color: 'warning.dark'
+                            }}
+                          />
+                        ) : (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>-</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ padding: '8px', textAlign: 'center' }}>
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
                           <Tooltip title="View Details">
-                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(item); }}>
-                              <Visibility sx={{ fontSize: 20, color: 'primary.main' }} />
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(item); }} sx={{ color: '#006400' }}>
+                              <Visibility sx={{ fontSize: 16 }} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Edit">
-                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); openEdit(item); }}>
-                              Edit
-                            </Button>
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(item); }} sx={{ color: '#1976d2' }}>
+                              <EditIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
                           </Tooltip>
-                          <Tooltip title="Transfer">
-                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); openTransfer(item); }}>
-                              Transfer
-                            </Button>
-                          </Tooltip>
-                          <Tooltip title="Archive">
-                            <Button size="small" color="error" variant="outlined" onClick={(e) => { e.stopPropagation(); setArchiveConfirm(item); }}>
-                              Archive
-                            </Button>
+                          <Tooltip title="QR Code">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleQrClick(item, e); }} sx={{ color: '#f57c00' }}>
+                              <QrCodeIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
                           </Tooltip>
                         </Stack>
                       </TableCell>
@@ -716,6 +766,24 @@ export default function ItemsInventoryPage() {
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography sx={{ mr: 1, fontSize: 20, color: 'text.secondary', fontWeight: 600 }}>💰</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                          Fund:
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={selectedItem.fund_cluster || "General Trust Fund"}
+                          sx={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            bgcolor: getFundClusterColor(selectedItem.fund_cluster),
+                            color: '#fff'
+                          }}
+                        />
+                      </Stack>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <QrCodeIcon sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} />
                       <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
                         {selectedItem.qr_code || "No QR code"}
@@ -762,6 +830,113 @@ export default function ItemsInventoryPage() {
                 </Grid>
               </Grid>
 
+              {/* Current MR Assignment */}
+              {selectedItem.currentMR ? (
+                <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'success.lighter', borderLeft: 4, borderColor: 'success.main' }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: 'success.dark' }}>
+                      Assigned To Memorandum Receipt
+                    </Typography>
+                    <Stack spacing={1}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          MR Number:
+                        </Typography>
+                        <Chip
+                          label={selectedItem.currentMR.mr_number}
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Accountable Officer:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedItem.currentMR.accountable_officer}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Entity:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedItem.currentMR.entity_name}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Status:
+                        </Typography>
+                        <Chip
+                          label={selectedItem.currentMR.status}
+                          size="small"
+                          color="success"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : selectedItem.assigned_user ? (
+                <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'info.lighter', borderLeft: 4, borderColor: 'info.main' }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: 'info.dark' }}>
+                      Assigned To User
+                    </Typography>
+                    <Stack spacing={1}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          User:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedItem.assigned_user.name}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {/* Current Borrow Information */}
+              {selectedItem.currentBorrow && (
+                <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'warning.lighter', borderLeft: 4, borderColor: 'warning.main' }}>
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: 'warning.dark' }}>
+                      Currently Borrowed
+                    </Typography>
+                    <Stack spacing={1}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Borrowed by:
+                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {selectedItem.currentBorrow.borrowedBy?.name || "Unknown"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Borrowed on:
+                        </Typography>
+                        <Typography variant="body2">
+                          {new Date(selectedItem.currentBorrow.borrowed_at).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                      {selectedItem.currentBorrow.expected_return_date && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Expected return:
+                          </Typography>
+                          <Typography variant="body2">
+                            {new Date(selectedItem.currentBorrow.expected_return_date).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* QR Code Preview Card */}
               {selectedItem.qr_code && (
                 <Card sx={{ mb: 3, borderRadius: 2 }}>
@@ -785,7 +960,9 @@ export default function ItemsInventoryPage() {
                             code: selectedItem.qr_code,
                             name: selectedItem.name,
                             serial: selectedItem.serial_number,
-                            category: categories.find(c => c.id === selectedItem.category_id)?.name
+                            category: categories.find(c => c.id === selectedItem.category_id)?.name,
+                            currentBorrow: selectedItem.current_borrow || selectedItem.currentBorrow,
+                            assigned_user: selectedItem.assigned_user
                           });
                           setQrModalOpen(true);
                         }}
@@ -794,7 +971,6 @@ export default function ItemsInventoryPage() {
                           value={selectedItem.qr_code} 
                           size={120}
                           level="H"
-                          includeMargin={true}
                         />
                       </Box>
                       <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
@@ -803,13 +979,14 @@ export default function ItemsInventoryPage() {
                       <Stack direction="row" spacing={1} justifyContent="center">
                         <Button 
                           size="small" 
-                          startIcon={<ZoomIn />}
                           onClick={() => {
                             setSelectedQrData({
                               code: selectedItem.qr_code,
                               name: selectedItem.name,
                               serial: selectedItem.serial_number,
-                              category: categories.find(c => c.id === selectedItem.category_id)?.name
+                              category: categories.find(c => c.id === selectedItem.category_id)?.name,
+                              currentBorrow: selectedItem.current_borrow || selectedItem.currentBorrow,
+                              assigned_user: selectedItem.assigned_user
                             });
                             setQrModalOpen(true);
                           }}
@@ -853,44 +1030,101 @@ export default function ItemsInventoryPage() {
                     </Typography>
                   </Box>
                   <Stack spacing={1.5}>
-                    {itemTimeline(selectedItem.id).map((ev, index) => (
-                      <Box 
-                        key={ev.id} 
-                        sx={{ 
-                          pl: 2, 
-                          borderLeft: 2, 
-                          borderColor: index === 0 ? 'primary.main' : 'divider',
-                          position: 'relative',
-                          '&:before': {
-                            content: '""',
-                            position: 'absolute',
-                            left: -5,
-                            top: 8,
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: index === 0 ? 'primary.main' : 'grey.500',
-                          }
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(ev.created_at).toLocaleString()}
+                    {/* Combined timeline: stock movements + borrow records */}
+                    {(() => {
+                      const stockEvents = itemTimeline(selectedItem.id).map(ev => ({
+                        ...ev,
+                        eventType: 'stock',
+                        date: new Date(ev.created_at)
+                      }));
+                      
+                      const borrowEvents = (selectedItem.borrowRecords || []).map(br => ({
+                        ...br,
+                        eventType: 'borrow',
+                        date: new Date(br.created_at)
+                      }));
+                      
+                      const allEvents = [...stockEvents, ...borrowEvents]
+                        .sort((a, b) => b.date - a.date);
+                      
+                      return allEvents.length > 0 ? (
+                        allEvents.map((ev, index) => (
+                          <Box 
+                            key={`${ev.eventType}-${ev.id}`} 
+                            sx={{ 
+                              pl: 2, 
+                              borderLeft: 3,
+                              borderColor: ev.eventType === 'borrow' 
+                                ? (index === 0 ? 'info.main' : 'info.light')
+                                : (index === 0 ? 'primary.main' : 'divider'),
+                              position: 'relative',
+                              pb: 1,
+                              '&:before': {
+                                content: '""',
+                                position: 'absolute',
+                                left: -7,
+                                top: 6,
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                bgcolor: ev.eventType === 'borrow' 
+                                  ? (index === 0 ? 'info.main' : 'info.light')
+                                  : (index === 0 ? 'primary.main' : 'grey.500'),
+                                border: '2px solid white',
+                              }
+                            }}
+                          >
+                            <Typography variant="caption" color="text.secondary">
+                              {ev.date.toLocaleString()}
+                            </Typography>
+                            
+                            {ev.eventType === 'borrow' ? (
+                              <>
+                                <Chip 
+                                  size="small" 
+                                  label={ev.status}
+                                  color={ev.status === 'Approved' ? 'info' : ev.status === 'Pending' ? 'warning' : 'default'}
+                                  sx={{ ml: 0, mb: 0.5, fontWeight: 600 }}
+                                />
+                                <Typography variant="body2" fontWeight={500}>
+                                  Borrow Request - {ev.status}
+                                </Typography>
+                                {ev.borrowedBy && (
+                                  <Typography variant="caption" display="block">
+                                    <strong>By:</strong> {ev.borrowedBy.name || 'Unknown'}
+                                  </Typography>
+                                )}
+                                {ev.purpose && (
+                                  <Typography variant="caption" display="block" color="text.secondary">
+                                    <strong>Purpose:</strong> {ev.purpose}
+                                  </Typography>
+                                )}
+                                {ev.expected_return_date && (
+                                  <Typography variant="caption" display="block" color="text.secondary">
+                                    <strong>Expected return:</strong> {new Date(ev.expected_return_date).toLocaleDateString()}
+                                  </Typography>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <Typography variant="body2" fontWeight={500}>
+                                  {ev.type || ev.action}
+                                </Typography>
+                                {ev.notes && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {ev.notes}
+                                  </Typography>
+                                )}
+                              </>
+                            )}
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                          No activity history available
                         </Typography>
-                        <Typography variant="body2" fontWeight={500}>
-                          {ev.type || ev.action}
-                        </Typography>
-                        {ev.notes && (
-                          <Typography variant="body2" color="text.secondary">
-                            {ev.notes}
-                          </Typography>
-                        )}
-                      </Box>
-                    ))}
-                    {itemTimeline(selectedItem.id).length === 0 && (
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                        No activity history available
-                      </Typography>
-                    )}
+                      );
+                    })()}
                   </Stack>
                 </CardContent>
               </Card>
@@ -925,7 +1159,6 @@ export default function ItemsInventoryPage() {
                     value={selectedQrData.code} 
                     size={256}
                     level="H"
-                    includeMargin={true}
                     renderAs="svg"
                   />
                 </Box>
@@ -935,10 +1168,9 @@ export default function ItemsInventoryPage() {
                   value={selectedQrData.code} 
                   size={200}
                   level="H"
-                  includeMargin={true}
                 />
                 
-                <Box sx={{ textAlign: 'center' }}>
+                <Box sx={{ textAlign: 'center', width: '100%' }}>
                   <Typography variant="h6" fontWeight={600}>
                     {selectedQrData.name}
                   </Typography>
@@ -958,6 +1190,54 @@ export default function ItemsInventoryPage() {
                   <Typography variant="caption" color="text.secondary">
                     Generated on: {new Date().toLocaleDateString()}
                   </Typography>
+
+                  {/* Assigned To Status */}
+                  {selectedQrData.assigned_user && (
+                    <Card sx={{ mt: 2, bgcolor: 'info.lighter', borderLeft: 4, borderColor: 'info.main' }}>
+                      <CardContent sx={{ p: 1.5 }}>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'info.dark', mb: 1 }}>
+                          Assigned To
+                        </Typography>
+                        <Stack spacing={0.5} sx={{ fontSize: '0.875rem' }}>
+                          <Box>
+                            <Typography variant="caption" fontWeight={600}>
+                              User: {selectedQrData.assigned_user.name}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Borrow Status */}
+                  {selectedQrData.currentBorrow && (
+                    <Card sx={{ mt: 2, bgcolor: 'warning.lighter', borderLeft: 4, borderColor: 'warning.main' }}>
+                      <CardContent sx={{ p: 1.5 }}>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'warning.dark', mb: 1 }}>
+                          Currently Borrowed
+                        </Typography>
+                        <Stack spacing={0.5} sx={{ fontSize: '0.875rem' }}>
+                          <Box>
+                            <Typography variant="caption" fontWeight={600}>
+                              Borrowed by: {selectedQrData.currentBorrow.borrowedBy?.name || "Unknown"}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption">
+                              Borrowed on: {new Date(selectedQrData.currentBorrow.borrowed_at).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                          {selectedQrData.currentBorrow.expected_return_date && (
+                            <Box>
+                              <Typography variant="caption">
+                                Expected return: {new Date(selectedQrData.currentBorrow.expected_return_date).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  )}
                 </Box>
               </Box>
             </DialogContent>
@@ -993,19 +1273,28 @@ export default function ItemsInventoryPage() {
         <DialogTitle>Add Item</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} fullWidth />
+            <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} fullWidth required />
             <TextField label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} fullWidth multiline minRows={2} />
-            <TextField select label="Category" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} fullWidth>
+            <TextField select label="Category" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} fullWidth required>
               {categories.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </TextField>
-            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
-            <TextField select label="Status" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} fullWidth>
-              {['Available','Borrowed','Under Maintenance','Lost','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
+            <TextField select label="Fund Cluster" value={form.fund_cluster} onChange={e => setForm(f => ({ ...f, fund_cluster: e.target.value }))} fullWidth required>
+              <MenuItem value="General Trust Fund">General Trust Fund</MenuItem>
+              <MenuItem value="Special Trust Fund">Special Trust Fund</MenuItem>
+              <MenuItem value="TEF Trust Fund">TEF Trust Fund</MenuItem>
+              <MenuItem value="MDS/RAF">MDS/RAF</MenuItem>
             </TextField>
-            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth>
-              <MenuItem value="">Unassigned</MenuItem>
+            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
+            <TextField select label="Condition" value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} fullWidth required>
+              {['Excellent','Good','Fair','Needs Repair','Damaged','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
+            </TextField>
+            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
+            <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
+            <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField label="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} fullWidth multiline minRows={2} />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1019,19 +1308,28 @@ export default function ItemsInventoryPage() {
         <DialogTitle>Edit Item</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} fullWidth />
+            <TextField label="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} fullWidth required />
             <TextField label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} fullWidth multiline minRows={2} />
-            <TextField select label="Category" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} fullWidth>
+            <TextField select label="Category" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} fullWidth required>
               {categories.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </TextField>
-            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
-            <TextField select label="Status" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} fullWidth>
-              {['Available','Borrowed','Under Maintenance','Lost','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
+            <TextField select label="Fund Cluster" value={form.fund_cluster} onChange={e => setForm(f => ({ ...f, fund_cluster: e.target.value }))} fullWidth required>
+              <MenuItem value="General Trust Fund">General Trust Fund</MenuItem>
+              <MenuItem value="Special Trust Fund">Special Trust Fund</MenuItem>
+              <MenuItem value="TEF Trust Fund">TEF Trust Fund</MenuItem>
+              <MenuItem value="MDS/RAF">MDS/RAF</MenuItem>
             </TextField>
-            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth>
-              <MenuItem value="">Unassigned</MenuItem>
+            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
+            <TextField select label="Condition" value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} fullWidth required>
+              {['Excellent','Good','Fair','Needs Repair','Damaged','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
+            </TextField>
+            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
+            <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
+            <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField label="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} fullWidth multiline minRows={2} />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1042,18 +1340,34 @@ export default function ItemsInventoryPage() {
 
       {/* Transfer Dialog */}
       <Dialog open={transferOpen} onClose={() => setTransferOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Transfer Item</DialogTitle>
+        <DialogTitle>Assign Item to User</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2">Select new office for: {transferItem?.name}</Typography>
-            <TextField select label="Office" value={transferOfficeId} onChange={e => setTransferOfficeId(e.target.value)} fullWidth>
-              {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
+            <Typography variant="body2">Assign item "{transferItem?.name}" to:</Typography>
+            {transferItem?.assigned_user && (
+              <Typography variant="caption" color="textSecondary">
+                Currently assigned to: {transferItem.assigned_user.name}
+              </Typography>
+            )}
+            {!transferItem?.assigned_user && (
+              <Typography variant="caption" color="textSecondary">
+                Currently unassigned
+              </Typography>
+            )}
+            <TextField 
+              select 
+              label="Assign to User" 
+              value={transferUserId} 
+              onChange={e => setTransferUserId(e.target.value)} 
+              fullWidth
+            >
+              {users.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
             </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTransferOpen(false)}>Cancel</Button>
-          <Button onClick={submitTransfer} disabled={mutating || !transferOfficeId} variant="contained">Transfer</Button>
+          <Button onClick={submitTransfer} disabled={mutating || !transferUserId} variant="contained">Assign</Button>
         </DialogActions>
       </Dialog>
 

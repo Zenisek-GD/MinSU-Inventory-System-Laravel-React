@@ -6,23 +6,29 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
         health: '/up',
-        
+
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Configure session handling for login/logout endpoints
         $middleware->statefulApi();
 
-         $middleware->api(prepend: [
+        $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        // Disable CSRF validation for API routes that use Bearer token authentication
+        // API routes use Sanctum tokens instead of CSRF tokens
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
         ]);
 
         //$middleware->alias([
         //'role' => \App\Http\Middle\RoleMiddleware::class, ]);
-        
+    
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

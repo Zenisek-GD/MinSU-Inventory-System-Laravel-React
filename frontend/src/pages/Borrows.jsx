@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import ReactDOM from 'react-dom/client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchBorrows,
@@ -50,6 +51,7 @@ import {
 } from "@mui/material";
 import OfficeChip from '../components/UI/OfficeChip';
 import PrimaryButton from '../components/UI/PrimaryButton';
+import BorrowerSlip from '../components/BorrowerSlip';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -72,6 +74,7 @@ import {
   Visibility as ViewIcon,
   Download as DownloadIcon,
   AssignmentReturn as ReturnIcon,
+  Print as PrintIcon,
 } from "@mui/icons-material";
 
 const BorrowsPage = () => {
@@ -79,11 +82,14 @@ const BorrowsPage = () => {
   const [borrows, setBorrows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const EMPTY_ITEM_ROW = { item_id: '', quantity: 1, borrow_date: '', expected_return_date: '', remarks: '' };
   const [form, setForm] = useState({
-    item_id: "",
-    borrow_date: "",
-    expected_return_date: "",
-    purpose: "",
+    borrowItems: [{ ...EMPTY_ITEM_ROW }],
+    purpose: '',
+    availability: 'yes',
+    designation: '',
+    borrower_name: '',
+    borrower_date: new Date().toISOString().slice(0, 10),
   });
   const [items, setItems] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -101,6 +107,55 @@ const BorrowsPage = () => {
     condition_after: '',
     notes: ''
   });
+
+  // --- Borrower's Slip print helper ---
+  const printBorrowerSlip = (borrowRecord) => {
+    const slipBorrows = borrowRecord ? [borrowRecord] : [];
+    const borrowerName = borrowRecord?.borrowerName ||
+      borrowRecord?.borrowedBy?.name ||
+      borrowRecord?.borrowed_by?.name ||
+      (typeof borrowRecord?.borrowed_by === 'string' ? borrowRecord.borrowed_by : '') ||
+      user?.name || '';
+    const designation = borrowRecord?.designation || 'Staff';
+    const availableYes = borrowRecord?.availability !== 'no';
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Please allow popups to print the Borrower\'s Slip.'); return; }
+    win.document.write(`<!DOCTYPE html><html><head><title>Borrower's Slip</title><style>body{margin:0;padding:0;}@media print{@page{size:A4;margin:12mm;}}</style></head><body><div id="slip-root"></div></body></html>`);
+    win.document.close();
+    const container = win.document.getElementById('slip-root');
+    const root = ReactDOM.createRoot(container);
+    root.render(
+      <BorrowerSlip
+        borrows={slipBorrows}
+        borrowerName={borrowerName}
+        borrowerDesignation={designation}
+        availableYes={availableYes}
+      />
+    );
+    setTimeout(() => { win.focus(); win.print(); }, 600);
+  };
+
+  // Multi-item slip print: accepts array of borrow records
+  const printBorrowerSlipMulti = (borrowRecords, formData) => {
+    const borrowerName = formData?.borrower_name || user?.name || '';
+    const designation = formData?.designation || 'Staff';
+    const availableYes = formData?.availability !== 'no';
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert("Please allow popups to print the Borrower's Slip."); return; }
+    win.document.write(`<!DOCTYPE html><html><head><title>Borrower's Slip</title><style>body{margin:0;padding:0;}@media print{@page{size:A4;margin:12mm;}}</style></head><body><div id="slip-root"></div></body></html>`);
+    win.document.close();
+    const root = ReactDOM.createRoot(win.document.getElementById('slip-root'));
+    root.render(
+      <BorrowerSlip
+        borrows={borrowRecords || []}
+        borrowerName={borrowerName}
+        borrowerDesignation={designation}
+        availableYes={availableYes}
+      />
+    );
+    setTimeout(() => { win.focus(); win.print(); }, 600);
+  };
+
   const [stats, setStats] = useState({
     pending: 0,
     approved: 0,
@@ -132,18 +187,18 @@ const BorrowsPage = () => {
   useEffect(() => {
     if (borrows.length > 0) {
       const now = new Date();
-      const myActiveBorrows = user?.role === 'staff' 
-        ? borrows.filter(b => b.user_id === user?.id && ['Approved', 'Borrowed'].includes(b.status)).length 
+      const myActiveBorrows = user?.role === 'staff'
+        ? borrows.filter(b => b.user_id === user?.id && ['Approved', 'Borrowed'].includes(b.status)).length
         : 0;
-      
+
       const stats = {
         pending: borrows.filter(b => b.status === 'Pending').length,
         approved: borrows.filter(b => b.status === 'Approved').length,
         returned: borrows.filter(b => b.status === 'Returned').length,
         rejected: borrows.filter(b => b.status === 'Rejected').length,
-        overdue: borrows.filter(b => 
-          b.status === 'Approved' && 
-          b.expected_return_date && 
+        overdue: borrows.filter(b =>
+          b.status === 'Approved' &&
+          b.expected_return_date &&
           new Date(b.expected_return_date) < now
         ).length,
         myActive: myActiveBorrows
@@ -176,15 +231,15 @@ const BorrowsPage = () => {
       if (user?.role === 'staff' && user?.office && user.office.id) {
         params.office_id = user.office.id;
       }
-      
+
       console.log('Fetching items with params:', params);
       const data = await fetchItems(params);
       console.log('RAW API RESPONSE:', data);
-      
+
       const list = Array.isArray(data) ? data : data.data || [];
       console.log('PARSED LIST:', list);
       console.log('LIST LENGTH:', list.length);
-      
+
       // NO FILTERING - Show everything
       setItems(list);
     } catch (err) {
@@ -198,53 +253,87 @@ const BorrowsPage = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // Multi-item row helpers
+  const handleItemRowChange = (idx, field, value) => {
+    const newRows = form.borrowItems.map((row, i) => i === idx ? { ...row, [field]: value } : row);
+    setForm(f => ({ ...f, borrowItems: newRows }));
+  };
+  const addItemRow = () => setForm(f => ({ ...f, borrowItems: [...f.borrowItems, { ...EMPTY_ITEM_ROW }] }));
+  const removeItemRow = (idx) => setForm(f => ({ ...f, borrowItems: f.borrowItems.filter((_, i) => i !== idx) }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form fields
-    if (!form.item_id) {
-      showSnackbar('Please select an item', 'error');
+
+    // Validate: at least one item row must have item_id and dates
+    const validRows = form.borrowItems.filter(r => r.item_id && r.borrow_date && r.expected_return_date);
+    if (validRows.length === 0) {
+      showSnackbar('Please fill in at least one item with dates', 'error');
       return;
     }
-    if (!form.borrow_date) {
-      showSnackbar('Please select a borrow date', 'error');
-      return;
-    }
-    if (!form.expected_return_date) {
-      showSnackbar('Please select an expected return date', 'error');
-      return;
-    }
-    if (!form.purpose || form.purpose.trim() === "") {
+    if (!form.purpose.trim()) {
       showSnackbar('Please enter a purpose', 'error');
       return;
     }
-    
-    // Check stock
-    const selectedItem = items.find(i => i.id === form.item_id);
-    if (selectedItem && Number(selectedItem.stock) <= 0) {
-      showSnackbar('Selected item has no available stock', 'error');
-      return;
+
+    // Check stock for each selected item
+    for (const row of validRows) {
+      const sel = items.find(i => i.id === row.item_id);
+      if (sel && Number(sel.stock ?? sel.quantity ?? 1) <= 0) {
+        showSnackbar(`"${sel.name}" has no available stock`, 'error');
+        return;
+      }
     }
 
     try {
-      console.log('Submitting borrow with data:', form);
-      const result = await createBorrow(form);
-      console.log('Borrow created:', result);
-      setBorrows((prev) => [result.borrow_record, ...prev]);
-      setForm({ item_id: "", borrow_date: "", expected_return_date: "", purpose: "" });
+      // Submit one borrow record per item row
+      const results = await Promise.all(
+        validRows.map(row =>
+          createBorrow({
+            item_id: row.item_id,
+            quantity: row.quantity || 1,
+            borrow_date: row.borrow_date,
+            expected_return_date: row.expected_return_date,
+            remarks: row.remarks || '',
+            purpose: form.purpose,
+          })
+        )
+      );
+
+      const newRecords = results.map(r => r.borrow_record || r);
+      setBorrows(prev => [...newRecords, ...prev]);
+
+      // Build slip records with shared form fields
+      const slipRecords = newRecords.map(rec => ({
+        ...rec,
+        designation: form.designation || '',
+        availability: form.availability || 'yes',
+        borrowerName: form.borrower_name || user?.name || '',
+      }));
+
+      // Reset form
+      setForm({
+        borrowItems: [{ ...EMPTY_ITEM_ROW }],
+        purpose: '',
+        availability: 'yes',
+        designation: '',
+        borrower_name: '',
+        borrower_date: new Date().toISOString().slice(0, 10),
+      });
       setDialogOpen(false);
-      showSnackbar("Borrow request submitted successfully", "success");
-      loadBorrows(); // Reload to get fresh data
+      showSnackbar(`${newRecords.length} borrow request${newRecords.length > 1 ? 's' : ''} submitted. Printing Borrower's Slip…`, 'success');
+      loadBorrows();
+
+      // Print slip with ALL item records
+      printBorrowerSlipMulti(slipRecords, form);
     } catch (err) {
-      console.error("Borrow submission error:", err);
-      console.error("Error response:", err.response?.data);
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to create borrow record";
+      console.error('Borrow submission error:', err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to create borrow record';
       const errors = err.response?.data?.errors;
       if (errors) {
         const firstError = Object.values(errors)[0];
-        showSnackbar(firstError[0] || errorMsg, "error");
+        showSnackbar(firstError[0] || errorMsg, 'error');
       } else {
-        showSnackbar(errorMsg, "error");
+        showSnackbar(errorMsg, 'error');
       }
     }
   };
@@ -370,9 +459,9 @@ const BorrowsPage = () => {
       // Show Pending, Approved, Borrowed, and Returned in "my" view
       if (!['Pending', 'Approved', 'Borrowed', 'Returned'].includes(borrow.status)) return false;
     }
-    
+
     if (filterStatus !== 'all' && borrow.status !== filterStatus) return false;
-    
+
     if (query) {
       const searchLower = query.toLowerCase();
       const borrowerName = borrow.borrowedBy?.name || borrow.borrowed_by?.name || '';
@@ -414,10 +503,10 @@ const BorrowsPage = () => {
               </Typography>
             </Box>
             <Tooltip title="Refresh">
-              <IconButton 
-                onClick={loadBorrows} 
-                sx={{ 
-                  bgcolor: 'primary.main', 
+              <IconButton
+                onClick={loadBorrows}
+                sx={{
+                  bgcolor: 'primary.main',
                   color: 'white',
                   '&:hover': { bgcolor: 'primary.dark' }
                 }}
@@ -426,7 +515,7 @@ const BorrowsPage = () => {
               </IconButton>
             </Tooltip>
           </Box>
-          
+
           {user?.office && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
               <OfficeChip office={user.office} locked />
@@ -439,9 +528,9 @@ const BorrowsPage = () => {
           {/* Stats Cards */}
           <Grid container spacing={2} sx={{ mb: 4 }}>
             <Grid item xs={6} sm={2.4}>
-              <Paper sx={{ 
-                p: 2, 
-                borderRadius: 2, 
+              <Paper sx={{
+                p: 2,
+                borderRadius: 2,
                 textAlign: 'center',
                 bgcolor: alpha(theme.palette.warning.main, 0.1),
                 border: '1px solid',
@@ -456,9 +545,9 @@ const BorrowsPage = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={2.4}>
-              <Paper sx={{ 
-                p: 2, 
-                borderRadius: 2, 
+              <Paper sx={{
+                p: 2,
+                borderRadius: 2,
                 textAlign: 'center',
                 bgcolor: alpha(theme.palette.success.main, 0.1),
                 border: '1px solid',
@@ -473,9 +562,9 @@ const BorrowsPage = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={2.4}>
-              <Paper sx={{ 
-                p: 2, 
-                borderRadius: 2, 
+              <Paper sx={{
+                p: 2,
+                borderRadius: 2,
                 textAlign: 'center',
                 bgcolor: alpha(theme.palette.info.main, 0.1),
                 border: '1px solid',
@@ -490,9 +579,9 @@ const BorrowsPage = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={2.4}>
-              <Paper sx={{ 
-                p: 2, 
-                borderRadius: 2, 
+              <Paper sx={{
+                p: 2,
+                borderRadius: 2,
                 textAlign: 'center',
                 bgcolor: alpha(theme.palette.error.main, 0.1),
                 border: '1px solid',
@@ -507,9 +596,9 @@ const BorrowsPage = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={2.4}>
-              <Paper sx={{ 
-                p: 2, 
-                borderRadius: 2, 
+              <Paper sx={{
+                p: 2,
+                borderRadius: 2,
                 textAlign: 'center',
                 bgcolor: alpha(theme.palette.error.main, 0.1),
                 border: '1px solid',
@@ -527,9 +616,9 @@ const BorrowsPage = () => {
         </Box>
 
         {/* Action Bar */}
-        <Paper sx={{ 
-          p: 3, 
-          mb: 4, 
+        <Paper sx={{
+          p: 3,
+          mb: 4,
           borderRadius: 3,
           bgcolor: 'background.paper',
           boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
@@ -540,7 +629,7 @@ const BorrowsPage = () => {
                 <PrimaryButton
                   startIcon={<AddIcon />}
                   onClick={() => setDialogOpen(true)}
-                  sx={{ 
+                  sx={{
                     borderRadius: 2,
                     px: 4,
                     py: 1.2,
@@ -570,10 +659,10 @@ const BorrowsPage = () => {
               />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 startIcon={<FilterIcon />}
-                sx={{ 
+                sx={{
                   borderRadius: 2,
                   py: 1.2,
                   width: '100%'
@@ -587,7 +676,7 @@ const BorrowsPage = () => {
           {/* View Mode Tabs (for staff) */}
           {viewTabs && (
             <Box sx={{ mt: 3, mb: 2 }}>
-              <Tabs 
+              <Tabs
                 value={viewMode}
                 onChange={(e, newValue) => {
                   setViewMode(newValue);
@@ -603,7 +692,7 @@ const BorrowsPage = () => {
                 }}
               >
                 {viewTabs.map((tab) => (
-                  <Tab 
+                  <Tab
                     key={tab.value}
                     value={tab.value}
                     icon={tab.icon}
@@ -612,9 +701,9 @@ const BorrowsPage = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {tab.label}
                         {tab.count !== undefined && (
-                          <Chip 
-                            label={tab.count} 
-                            size="small" 
+                          <Chip
+                            label={tab.count}
+                            size="small"
                             color={viewMode === tab.value ? 'primary' : 'default'}
                             sx={{ minWidth: 28 }}
                           />
@@ -634,27 +723,27 @@ const BorrowsPage = () => {
 
           {/* Status Tabs */}
           <Box sx={{ mt: 3 }}>
-            <Tabs 
+            <Tabs
               value={filterStatus}
               onChange={(e, newValue) => setFilterStatus(newValue)}
               variant="scrollable"
               scrollButtons="auto"
             >
               {statusTabs.map((tab) => (
-                <Tab 
+                <Tab
                   key={tab.value}
                   value={tab.value}
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {tab.label}
-                      <Chip 
-                        label={tab.count} 
-                        size="small" 
+                      <Chip
+                        label={tab.count}
+                        size="small"
                         sx={{ height: 20, fontSize: '0.7rem' }}
                       />
                     </Box>
                   }
-                  sx={{ 
+                  sx={{
                     borderRadius: 2,
                     minHeight: 40,
                     fontWeight: filterStatus === tab.value ? 600 : 400
@@ -665,196 +754,220 @@ const BorrowsPage = () => {
           </Box>
         </Paper>
 
-        {/* Create Borrow Request Dialog */}
-        <Dialog 
-          open={dialogOpen} 
-          onClose={() => setDialogOpen(false)} 
-          maxWidth="sm" 
+        {/* ── New Borrow Request — Borrower's Slip Form ──────────────── */}
+        <Dialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          maxWidth="md"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
-            <Typography variant="h5" fontWeight="700">
-              New Borrow Request
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Fill in the details to request an item
-            </Typography>
+          {/* Slip Header */}
+          <DialogTitle sx={{ p: 0 }}>
+            <Box sx={{ background: 'linear-gradient(135deg,#006400 0%,#004d00 100%)', color: 'white', px: 3, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h6" fontWeight={800} letterSpacing={0.5}>🖨 BORROWER'S SLIP FORM</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.8 }}>Mindoro State University — MinSU Bongabong Campus &nbsp;|&nbsp; MRC-B01G</Typography>
+              </Box>
+              <Chip label="DRAFT" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
+            </Box>
           </DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent sx={{ pt: 3 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
+              {/* ── Custodian Section ── */}
+              <Paper elevation={0} sx={{ border: '1px solid #ddd', borderRadius: 2, p: 2, mb: 2 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>For Custodian</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Typography variant="body2" fontWeight={600}>Availability of Equipment:</Typography>
                   <TextField
-                    select
-                    fullWidth
-                    label="Select Item"
-                    name="item_id"
-                    value={form.item_id}
-                    onChange={handleFormChange}
-                    required
-                    variant="outlined"
-                    size="small"
+                    select size="small" value={form.availability ?? 'yes'}
+                    onChange={e => setForm(f => ({ ...f, availability: e.target.value }))}
+                    sx={{ minWidth: 110 }}
                   >
-                    <MenuItem value="">Choose an item</MenuItem>
-                    {items.map((item) => (
-                      <MenuItem key={item.id} value={item.id}>
-                        <Box sx={{ width: '100%' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                            <Typography variant="body1" fontWeight="500">{item.name}</Typography>
-                            <Chip 
-                              label={item.office?.name || 'No Office'} 
-                              size="small" 
-                              sx={{ 
-                                ml: 1,
-                                fontSize: '0.7rem',
-                                height: 20,
-                                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                color: 'primary.main'
-                              }}
-                            />
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              {item.category?.name || item.category}
-                            </Typography>
-                            <Typography 
-                              variant="caption" 
-                              fontWeight="600"
-                              color={Number(item.stock) <= 0 ? "error.main" : "success.main"}
-                            >
-                              Stock: {item.stock}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </MenuItem>
-                    ))}
+                    <MenuItem value="yes">✅ YES</MenuItem>
+                    <MenuItem value="no">❌ NO</MenuItem>
                   </TextField>
-                </Grid>
-                
-                {/* Selected item quick info */}
-                {form.item_id && (
-                  <Grid item xs={12}>
-                    <Paper sx={{ 
-                      p: 2.5, 
-                      border: '1px dashed', 
-                      borderColor: 'divider', 
-                      borderRadius: 2,
-                      bgcolor: 'grey.50'
-                    }}>
-                      <Typography variant="subtitle1" fontWeight="600" gutterBottom>
-                        Selected Item Details
-                      </Typography>
-                      {(() => {
-                        const sel = items.find(i => i.id === form.item_id);
-                        if (!sel) return <Typography variant="body2">Loading item...</Typography>;
-                        return (
-                          <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={8}>
-                              <Typography variant="body1" fontWeight="600" gutterBottom>
-                                {sel.name}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary" gutterBottom>
-                                {sel.category?.name || sel.category}
-                              </Typography>
-                              <Chip 
-                                label={sel.office?.name || 'No Office'} 
-                                size="small"
-                                icon={<InfoIcon />}
-                                sx={{ 
-                                  mt: 0.5,
-                                  bgcolor: alpha(theme.palette.info.main, 0.1),
-                                  color: 'info.main',
-                                  fontWeight: 600
-                                }}
-                              />
-                            </Grid>
-                            <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                              <Box sx={{ 
-                                display: 'inline-block',
-                                p: 1,
-                                borderRadius: 1,
-                                bgcolor: Number(sel.stock) <= 0 ? 'error.50' : 'success.50',
-                                border: '1px solid',
-                                borderColor: Number(sel.stock) <= 0 ? 'error.100' : 'success.100'
-                              }}>
-                                <Typography 
-                                  variant="h6" 
-                                  color={Number(sel.stock) <= 0 ? 'error.main' : 'success.main'}
-                                >
-                                  {sel.stock}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Available
-                                </Typography>
+                </Box>
+              </Paper>
+
+              {/* ── For Borrower note ── */}
+              <Paper elevation={0} sx={{ border: '1px solid #ddd', borderRadius: 2, p: 2, mb: 2, bgcolor: '#fafafa' }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>For Borrower</Typography>
+                <Typography variant="body2" sx={{ fontStyle: 'italic', fontSize: '0.82rem' }}>
+                  I acknowledge to have received from the <strong>SCHOOL'S PROPERTY</strong> of the MinSU Bongabong Campus the following:
+                </Typography>
+              </Paper>
+
+              {/* ── Item Rows (repeating) ── */}
+              <Paper elevation={0} sx={{ border: '1px solid #ddd', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+                <Box sx={{ bgcolor: alpha('#006400', 0.07), px: 2, py: 1, borderBottom: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>Items to Borrow</Typography>
+                  <Chip label={`${form.borrowItems.length} item${form.borrowItems.length > 1 ? 's' : ''}`} size="small" color="primary" sx={{ fontWeight: 700 }} />
+                </Box>
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {form.borrowItems.map((row, idx) => {
+                    const sel = items.find(i => i.id === row.item_id);
+                    return (
+                      <Paper key={idx} elevation={0} sx={{ border: '1px solid #e8e8e8', borderRadius: 1.5, p: 1.5, position: 'relative', bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        {/* Row label + Remove */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="caption" fontWeight={700} color="text.secondary">ITEM #{idx + 1}</Typography>
+                          {form.borrowItems.length > 1 && (
+                            <Button
+                              size="small" color="error" variant="text"
+                              startIcon={<DeleteIcon sx={{ fontSize: 14 }} />}
+                              onClick={() => removeItemRow(idx)}
+                              sx={{ py: 0, minWidth: 0, fontSize: '0.72rem', fontWeight: 700 }}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </Box>
+
+                        <Grid container spacing={1.5}>
+                          {/* Item dropdown */}
+                          <Grid item xs={12} sm={5}>
+                            <TextField
+                              select fullWidth size="small" label="Item / Equipment *"
+                              value={row.item_id}
+                              onChange={e => handleItemRowChange(idx, 'item_id', e.target.value)}
+                              required={idx === 0}
+                            >
+                              <MenuItem value=""><em>— Select item —</em></MenuItem>
+                              {items.map(item => (
+                                <MenuItem key={item.id} value={item.id}>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={600}>{item.name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {item.category?.name} &nbsp;·&nbsp; Stock: {item.stock ?? item.quantity ?? 0}
+                                    </Typography>
+                                  </Box>
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+
+                          {/* QTY */}
+                          <Grid item xs={6} sm={1}>
+                            <TextField
+                              fullWidth size="small" label="QTY" type="number"
+                              value={row.quantity}
+                              onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
+                              inputProps={{ min: 1 }}
+                            />
+                          </Grid>
+
+                          {/* Date Released */}
+                          <Grid item xs={6} sm={3}>
+                            <TextField
+                              fullWidth size="small" label="Date Released *" type="date"
+                              value={row.borrow_date}
+                              onChange={e => handleItemRowChange(idx, 'borrow_date', e.target.value)}
+                              required={idx === 0}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+
+                          {/* Expected Return */}
+                          <Grid item xs={6} sm={3}>
+                            <TextField
+                              fullWidth size="small" label="Expected Return *" type="date"
+                              value={row.expected_return_date}
+                              onChange={e => handleItemRowChange(idx, 'expected_return_date', e.target.value)}
+                              required={idx === 0}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+
+                          {/* Remarks */}
+                          <Grid item xs={12}>
+                            <TextField
+                              fullWidth size="small" label="Remarks"
+                              value={row.remarks}
+                              onChange={e => handleItemRowChange(idx, 'remarks', e.target.value)}
+                              placeholder="Notes about condition, accessories…"
+                            />
+                          </Grid>
+
+                          {/* Item info chips */}
+                          {sel && (
+                            <Grid item xs={12}>
+                              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Chip label={sel.condition || 'Good'} size="small" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
+                                {sel.serial_number && <Chip label={`S/N: ${sel.serial_number}`} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} />}
+                                {sel.office?.name && <Chip icon={<InfoIcon sx={{ fontSize: 14 }} />} label={sel.office.name} size="small" variant="outlined" color="info" />}
+                                <Chip
+                                  label={`Qty available: ${sel.stock ?? sel.quantity ?? '—'}`}
+                                  size="small"
+                                  color={Number(sel.stock ?? sel.quantity) > 0 ? 'success' : 'error'}
+                                />
                               </Box>
                             </Grid>
-                          </Grid>
-                        );
-                      })()}
-                    </Paper>
+                          )}
+                        </Grid>
+                      </Paper>
+                    );
+                  })}
+
+                  {/* Add Item Row button */}
+                  <Button
+                    variant="outlined" size="small"
+                    startIcon={<AddIcon />}
+                    onClick={addItemRow}
+                    sx={{ alignSelf: 'flex-start', borderRadius: 1.5, fontWeight: 700, borderStyle: 'dashed', color: '#006400', borderColor: '#006400', '&:hover': { bgcolor: alpha('#006400', 0.05) } }}
+                  >
+                    Add Another Item
+                  </Button>
+                </Box>
+              </Paper>
+
+              {/* ── Purpose ── */}
+              <Paper elevation={0} sx={{ border: '1px solid #ddd', borderRadius: 2, p: 2, mb: 2 }}>
+                <TextField fullWidth size="small" label="Purpose *" name="purpose" value={form.purpose} onChange={handleFormChange} required multiline rows={2} placeholder="Describe the purpose of borrowing this item…" />
+              </Paper>
+
+              {/* ── Borrower Info ── */}
+              <Paper elevation={0} sx={{ border: '1px solid #ddd', borderRadius: 2, p: 2, bgcolor: '#fafafa' }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 1.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Borrower Information</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={5}>
+                    <TextField fullWidth size="small" label="Full Name" name="borrower_name" value={form.borrower_name ?? user?.name ?? ''} onChange={handleFormChange} InputProps={{ readOnly: !!user?.name }} helperText={user?.name ? 'Auto-filled from your account' : ''} />
                   </Grid>
-                )}
-                
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Borrow Date"
-                    name="borrow_date"
-                    type="date"
-                    value={form.borrow_date}
-                    onChange={handleFormChange}
-                    required
-                    InputLabelProps={{ shrink: true }}
-                    variant="outlined"
-                    size="small"
-                  />
+                  <Grid item xs={12} sm={4}>
+                    <TextField fullWidth size="small" label="Designation / Position" name="designation" value={form.designation ?? ''} onChange={handleFormChange} placeholder="e.g. Faculty, Admin Staff" />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField fullWidth size="small" label="Date" name="borrower_date" type="date" value={form.borrower_date ?? new Date().toISOString().slice(0, 10)} onChange={handleFormChange} InputLabelProps={{ shrink: true }} />
+                  </Grid>
+                  {user?.office?.name && (
+                    <Grid item xs={12}>
+                      <TextField fullWidth size="small" label="Office / Department" value={user.office.name} InputProps={{ readOnly: true }} helperText="Auto-filled from your account" />
+                    </Grid>
+                  )}
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Expected Return Date"
-                    name="expected_return_date"
-                    type="date"
-                    value={form.expected_return_date}
-                    onChange={handleFormChange}
-                    required
-                    InputLabelProps={{ shrink: true }}
-                    variant="outlined"
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Purpose"
-                    name="purpose"
-                    value={form.purpose}
-                    onChange={handleFormChange}
-                    required
-                    multiline
-                    rows={3}
-                    placeholder="Please describe the purpose of borrowing this item..."
-                    variant="outlined"
-                    size="small"
-                  />
-                </Grid>
-              </Grid>
+              </Paper>
             </DialogContent>
-            <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
-              <Button 
-                onClick={() => setDialogOpen(false)}
-                sx={{ borderRadius: 2, px: 3 }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                variant="contained"
-                sx={{ borderRadius: 2, px: 4 }}
-              >
-                Submit Request
-              </Button>
+            <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider', flexDirection: 'column', alignItems: 'stretch', gap: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                <PrintIcon sx={{ fontSize: 13 }} />
+                The Borrower's Slip will automatically open for printing after submission.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Button
+                  onClick={() => setDialogOpen(false)}
+                  sx={{ borderRadius: 2, px: 3 }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={<PrintIcon />}
+                  sx={{ borderRadius: 2, px: 4, bgcolor: '#006400', '&:hover': { bgcolor: '#004d00' } }}
+                >
+                  Submit &amp; Print Slip
+                </Button>
+              </Box>
             </DialogActions>
           </form>
         </Dialog>
@@ -864,21 +977,21 @@ const BorrowsPage = () => {
           <Grid container spacing={3}>
             {[...Array(3)].map((_, index) => (
               <Grid item xs={12} key={index}>
-                <Skeleton 
-                  variant="rectangular" 
-                  height={180} 
-                  sx={{ 
+                <Skeleton
+                  variant="rectangular"
+                  height={180}
+                  sx={{
                     borderRadius: 3,
                     animation: 'pulse 1.5s ease-in-out infinite'
-                  }} 
+                  }}
                 />
               </Grid>
             ))}
           </Grid>
         ) : error ? (
-          <Alert 
-            severity="error" 
-            sx={{ 
+          <Alert
+            severity="error"
+            sx={{
               borderRadius: 2,
               mb: 2
             }}
@@ -891,8 +1004,8 @@ const BorrowsPage = () => {
             {error}
           </Alert>
         ) : filteredBorrows.length === 0 ? (
-          <Paper sx={{ 
-            p: 8, 
+          <Paper sx={{
+            p: 8,
             textAlign: 'center',
             borderRadius: 3,
             bgcolor: 'background.paper'
@@ -956,7 +1069,7 @@ const BorrowsPage = () => {
                         </Stack>
                       </td>
                       <td style={{ padding: 12 }}>
-                        <Chip 
+                        <Chip
                           icon={getStatusIcon(br.status)}
                           label={br.status}
                           color={getStatusColor(br.status)}
@@ -982,6 +1095,7 @@ const BorrowsPage = () => {
                             <Button startIcon={<DeleteIcon />} variant="outlined" color="error" size="small" onClick={() => handleDelete(br.id)}>Delete</Button>
                           )}
                           <Button startIcon={<ViewIcon />} variant="text" size="small" onClick={() => { setSelectedBorrow(br); setDetailsOpen(true); }}>Details</Button>
+                          <Button startIcon={<PrintIcon />} variant="text" size="small" color="secondary" onClick={() => printBorrowerSlip(br)}>Slip</Button>
                         </Stack>
                       </td>
                     </tr>
@@ -993,8 +1107,8 @@ const BorrowsPage = () => {
         )}
 
         {/* Details Dialog */}
-        <Dialog 
-          open={detailsOpen} 
+        <Dialog
+          open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
           maxWidth="md"
           fullWidth
@@ -1038,13 +1152,13 @@ const BorrowsPage = () => {
                       Status
                     </Typography>
                     <Box sx={{ mt: 0.5 }}>
-                      <Chip 
-                        label={selectedBorrow.status} 
+                      <Chip
+                        label={selectedBorrow.status}
                         color={
                           selectedBorrow.status === 'Approved' ? 'success' :
-                          selectedBorrow.status === 'Pending' ? 'warning' :
-                          selectedBorrow.status === 'Returned' ? 'info' :
-                          'error'
+                            selectedBorrow.status === 'Pending' ? 'warning' :
+                              selectedBorrow.status === 'Returned' ? 'info' :
+                                'error'
                         }
                         sx={{ fontWeight: 600 }}
                       />
@@ -1127,10 +1241,18 @@ const BorrowsPage = () => {
             )}
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button 
+            <Button
+              onClick={() => selectedBorrow && printBorrowerSlip(selectedBorrow)}
+              variant="outlined"
+              startIcon={<PrintIcon />}
+              sx={{ borderRadius: 2, borderColor: '#006400', color: '#006400', '&:hover': { borderColor: '#004d00', bgcolor: 'rgba(0,100,0,0.04)' } }}
+            >
+              Print Slip
+            </Button>
+            <Button
               onClick={() => setDetailsOpen(false)}
               variant="contained"
-              sx={{ 
+              sx={{
                 bgcolor: '#006400',
                 '&:hover': { bgcolor: '#004d00' }
               }}
@@ -1141,8 +1263,8 @@ const BorrowsPage = () => {
         </Dialog>
 
         {/* Return Item Dialog */}
-        <Dialog 
-          open={returnDialogOpen} 
+        <Dialog
+          open={returnDialogOpen}
           onClose={handleCloseReturnDialog}
           maxWidth="sm"
           fullWidth
@@ -1150,8 +1272,8 @@ const BorrowsPage = () => {
             sx: { borderRadius: 2 }
           }}
         >
-          <DialogTitle sx={{ 
-            bgcolor: '#006400', 
+          <DialogTitle sx={{
+            bgcolor: '#006400',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
@@ -1167,9 +1289,9 @@ const BorrowsPage = () => {
                   You are returning: <strong>{selectedBorrow.item?.name}</strong>
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
-                  Original Condition: <Chip 
-                    label={selectedBorrow.condition_before} 
-                    size="small" 
+                  Original Condition: <Chip
+                    label={selectedBorrow.condition_before}
+                    size="small"
                     color="info"
                   />
                 </Typography>
@@ -1203,17 +1325,17 @@ const BorrowsPage = () => {
             )}
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button 
+            <Button
               onClick={handleCloseReturnDialog}
               variant="outlined"
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleReturnSubmit}
               variant="contained"
               startIcon={<ReturnIcon />}
-              sx={{ 
+              sx={{
                 bgcolor: '#006400',
                 '&:hover': { bgcolor: '#004d00' }
               }}
@@ -1230,11 +1352,11 @@ const BorrowsPage = () => {
           onClose={handleCloseSnackbar}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         >
-          <Alert 
-            onClose={handleCloseSnackbar} 
+          <Alert
+            onClose={handleCloseSnackbar}
             severity={snackbar.severity}
             variant="filled"
-            sx={{ 
+            sx={{
               borderRadius: 2,
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
             }}

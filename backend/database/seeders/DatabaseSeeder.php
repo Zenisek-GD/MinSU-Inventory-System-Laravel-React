@@ -8,6 +8,8 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\BorrowRecord;
 use App\Models\StockMovement;
+use App\Models\College;
+use App\Models\Department;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -20,12 +22,39 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Create colleges
+        $engineering = College::firstOrCreate(['name' => 'Engineering']);
+        $arts = College::firstOrCreate(['name' => 'Arts and Sciences']);
+        $business = College::firstOrCreate(['name' => 'Business']);
+
+        // Create departments
+        $cs = Department::firstOrCreate([
+            'college_id' => $engineering->id,
+            'name' => 'Computer Science'
+        ]);
+        $ee = Department::firstOrCreate([
+            'college_id' => $engineering->id,
+            'name' => 'Electrical Engineering'
+        ]);
+        $math = Department::firstOrCreate([
+            'college_id' => $arts->id,
+            'name' => 'Mathematics'
+        ]);
+        $acct = Department::firstOrCreate([
+            'college_id' => $business->id,
+            'name' => 'Accounting'
+        ]);
+
         // Create offices
         $office1 = Office::create([
             'name' => 'Main Office',
             'location' => 'Floor 1',
             'description' => 'Central office location',
             'qr_code' => 'OFFICE-001',
+            'department_id' => $cs->id,
+            'room_number' => '101',
+            'building' => 'Main Building',
+            'floor' => '1',
         ]);
 
         $office2 = Office::create([

@@ -21,17 +21,17 @@ import {
 import { fetchItems } from '../api/item';
 import api from '../api/axios';
 
-export default function ReceiveItemsDialog({ open, onClose, purchaseRequest, onSuccess }) {
+export default function ReceiveItemsDialog({ open, onClose, memorandumReceipt, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [inventoryItems, setInventoryItems] = useState([]);
   const [receivedItems, setReceivedItems] = useState([]);
 
   useEffect(() => {
-    if (open && purchaseRequest) {
+    if (open && memorandumReceipt) {
       loadData();
     }
-  }, [open, purchaseRequest]);
+  }, [open, memorandumReceipt]);
 
   const loadData = async () => {
     try {
@@ -39,8 +39,8 @@ export default function ReceiveItemsDialog({ open, onClose, purchaseRequest, onS
       const itemsList = Array.isArray(itemsRes) ? itemsRes : (itemsRes?.data || []);
       setInventoryItems(itemsList);
 
-      // Initialize received items from purchase request items
-      const initialReceived = purchaseRequest.items.map(prItem => ({
+      // Initialize received items from memorandum receipt items
+      const initialReceived = memorandumReceipt.items.map(prItem => ({
         pr_item_id: prItem.id,
         item_name: prItem.item_name,
         quantity_requested: prItem.quantity,
@@ -82,7 +82,7 @@ export default function ReceiveItemsDialog({ open, onClose, purchaseRequest, onS
     setError('');
 
     try {
-      await api.post(`/purchase-requests/${purchaseRequest.id}/receive`, {
+      await api.post(`/memorandum-receipts/${memorandumReceipt.id}/return`, {
         items: receivedItems
       });
 
@@ -96,22 +96,22 @@ export default function ReceiveItemsDialog({ open, onClose, purchaseRequest, onS
     }
   };
 
-  if (!purchaseRequest) return null;
+  if (!memorandumReceipt) return null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
-        Receive Items - PR #{purchaseRequest.pr_number}
+        Return Equipment - MR #{memorandumReceipt.mr_number}
       </DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>Office:</strong> {purchaseRequest.office?.name || 'N/A'}
+            <strong>Office:</strong> {memorandumReceipt.office?.name || 'N/A'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            <strong>Purpose:</strong> {purchaseRequest.purpose || 'N/A'}
+            <strong>Purpose:</strong> {memorandumReceipt.purpose || 'N/A'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Map each requested item to an inventory item and record quantity received
@@ -180,7 +180,7 @@ export default function ReceiveItemsDialog({ open, onClose, purchaseRequest, onS
         <Box sx={{ mt: 2 }}>
           <Alert severity="info">
             <strong>Note:</strong> Stock movements will be automatically created for each received item.
-            The purchase request status will be updated to "Received".
+            The memorandum receipt status will be updated to "Received".
           </Alert>
         </Box>
       </DialogContent>

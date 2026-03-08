@@ -4,19 +4,33 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Office extends Model
 {
     use HasFactory;
 
+    // Unified fillable including legacy fields and new hierarchy fields
     protected $fillable = [
         'name',
+        'type',
+        'category',
         'qr_code',
         'description',
         'location',
         'rooms',
-        'laboratories'
+        'laboratories',
+        // hierarchy
+        'department_id',
+        'room_number',
+        'building',
+        'floor',
     ];
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
 
 
     // Relationships

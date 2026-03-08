@@ -28,7 +28,7 @@ ChartJS.register(
   Filler
 );
 
-export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 'Daily' }) {
+export function DashboardCharts({ memorandumReceipts, borrows, items, timeRange = 'Daily' }) {
   const theme = useTheme();
 
   // Helper: filter by time range based on created_at date
@@ -45,27 +45,27 @@ export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 
     });
   };
 
-  const prFiltered = filterByRange(purchaseRequests);
+  const mrFiltered = filterByRange(memorandumReceipts);
   const brFiltered = filterByRange(borrows);
 
   // Calculate stats for summary cards
-  const totalRequests = prFiltered.length + brFiltered.length;
+  const totalRequests = mrFiltered.length + brFiltered.length;
   const approvedRequests = 
-    prFiltered.filter(pr => pr.status === 'Approved').length +
+    mrFiltered.filter(mr => mr.status === 'Approved').length +
     brFiltered.filter(br => br.status === 'Approved').length;
   const pendingRequests = 
-    prFiltered.filter(pr => pr.status === 'Pending').length +
+    mrFiltered.filter(mr => mr.status === 'Pending').length +
     brFiltered.filter(br => br.status === 'Pending').length;
 
-  // Purchase Requests by Status
-  const prStatusCounts = ['Pending', 'Approved', 'Rejected'].map(status =>
-    prFiltered.filter(pr => pr.status === status).length
+  // Memorandum Receipts by Status
+  const mrStatusCounts = ['Pending', 'Approved', 'Rejected'].map(status =>
+    mrFiltered.filter(mr => mr.status === status).length
   );
-  const prStatusData = {
+  const mrStatusData = {
     labels: ['Pending', 'Approved', 'Rejected'],
     datasets: [{
-      label: 'Purchase Requests',
-      data: prStatusCounts,
+      label: 'Memorandum Receipts',
+      data: mrStatusCounts,
       backgroundColor: [
         alpha(theme.palette.warning.main, 0.7),
         alpha(theme.palette.success.main, 0.7),
@@ -143,9 +143,9 @@ export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
     
-    const prCount = prFiltered.filter(pr => {
-      const prDate = pr.created_at?.split('T')[0];
-      return prDate === dateStr;
+    const prCount = mrFiltered.filter(mr => {
+      const mrDate = mr.created_at?.split('T')[0];
+      return mrDate === dateStr;
     }).length;
 
     const brCount = brFiltered.filter(br => {
@@ -164,7 +164,7 @@ export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 
     labels: last7Days.map(d => d.date),
     datasets: [
       {
-        label: 'Purchase Requests',
+        label: 'Memorandum Receipts',
         data: last7Days.map(d => d.prCount),
         fill: true,
         backgroundColor: alpha(theme.palette.primary.main, 0.08),
@@ -540,7 +540,7 @@ export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 
           </Card>
         </Grid>
 
-        {/* Purchase Requests Status - Bar */}
+        {/* Memorandum Receipts Status - Bar */}
         <Grid item xs={12} md={6}>
           <Card sx={{ 
             height: 380,
@@ -554,14 +554,14 @@ export function DashboardCharts({ purchaseRequests, borrows, items, timeRange = 
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Purchase Requests by Status
+                  Memorandum Receipts by Status
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Distribution of purchase request statuses
+                  Distribution of memorandum receipt statuses
                 </Typography>
               </Box>
               <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
-                <Bar data={prStatusData} options={barChartOptions} />
+                <Bar data={mrStatusData} options={barChartOptions} />
               </Box>
             </CardContent>
           </Card>

@@ -33,8 +33,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
-  <Card 
-    sx={{ 
+  <Card
+    sx={{
       height: '100%',
       cursor: onClick ? 'pointer' : 'default',
       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -52,7 +52,7 @@ const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
         height: '4px',
         background: 'linear-gradient(90deg, #006400 0%, #004d00 100%)',
       },
-      '&:hover': { 
+      '&:hover': {
         transform: onClick ? 'translateY(-8px) scale(1.02)' : 'none',
         boxShadow: onClick ? '0 20px 40px rgba(0, 100, 0, 0.15)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
         borderColor: onClick ? '#006400' : 'grey.300',
@@ -67,12 +67,12 @@ const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
     <CardContent sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <Box sx={{ flex: 1 }}>
-          <Typography 
-            gutterBottom 
-            variant="overline" 
+          <Typography
+            gutterBottom
+            variant="overline"
             fontWeight="bold"
-            sx={{ 
-              color: 'grey.600', 
+            sx={{
+              color: 'grey.600',
               fontSize: '0.65rem',
               letterSpacing: '1px',
               textTransform: 'uppercase'
@@ -90,12 +90,12 @@ const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
               </Typography>
             )}
             {trend && (
-              <Chip 
-                label={trend} 
-                size="small" 
+              <Chip
+                label={trend}
+                size="small"
                 color="success"
-                sx={{ 
-                  height: '20px', 
+                sx={{
+                  height: '20px',
                   fontSize: '0.6rem',
                   fontWeight: 'bold'
                 }}
@@ -103,11 +103,11 @@ const StatCard = ({ title, value, icon, subtitle, trend, onClick }) => (
             )}
           </Box>
         </Box>
-        <Box 
+        <Box
           className="stat-icon"
-          sx={{ 
-            color: '#006400', 
-            fontSize: 56, 
+          sx={{
+            color: '#006400',
+            fontSize: 56,
             opacity: 0.9,
             transition: 'all 0.3s ease',
             filter: 'drop-shadow(0 4px 8px rgba(0, 100, 0, 0.1))'
@@ -168,53 +168,53 @@ const AdminDashboard = () => {
     },
     {
       title: 'Pending Requests',
-      value: stats.purchaseRequests.filter(pr => pr.status === 'Pending').length,
+      value: stats.memorandumReceipts.filter(mr => mr.status === 'Issued').length,
       icon: <PRIcon fontSize="inherit" />,
       subtitle: 'Awaiting approval',
       trend: '',
-      onClick: () => navigate('/purchase-requests')
+      onClick: () => navigate('/memorandum-receipts')
     },
   ] : [];
 
   const quickActions = [
-    { 
-      icon: <UsersIcon />, 
-      label: 'User Management', 
+    {
+      icon: <UsersIcon />,
+      label: 'User Management',
       description: 'Manage system users',
       path: '/users',
       color: '#006400'
     },
-    { 
-      icon: <OfficeIcon />, 
-      label: 'Office Management', 
+    {
+      icon: <OfficeIcon />,
+      label: 'Office Management',
       description: 'Manage departments',
       path: '/offices',
       color: '#004d00'
     },
-    { 
-      icon: <ItemsIcon />, 
-      label: 'Inventory Control', 
+    {
+      icon: <ItemsIcon />,
+      label: 'Inventory Control',
       description: 'Manage items & stock',
       path: '/items',
       color: '#006400'
     },
-    { 
-      icon: <PRIcon />, 
-      label: 'Purchase Requests', 
+    {
+      icon: <PRIcon />,
+      label: 'Memorandum Receipts',
       description: 'Review & approve PRs',
-      path: '/purchase-requests',
+      path: '/memorandum-receipts',
       color: '#004d00'
     },
-    { 
-      icon: <BorrowIcon />, 
-      label: 'Borrow Management', 
+    {
+      icon: <BorrowIcon />,
+      label: 'Borrow Management',
       description: 'Track borrowed items',
       path: '/borrow-requests',
       color: '#006400'
     },
-    { 
-      icon: <ReportsIcon />, 
-      label: 'Analytics & Reports', 
+    {
+      icon: <ReportsIcon />,
+      label: 'Analytics & Reports',
       description: 'View system analytics',
       path: '/reports',
       color: '#004d00'
@@ -222,62 +222,62 @@ const AdminDashboard = () => {
   ];
 
   const recentActivities = [
-    { 
-      user: 'Dr. Maria Santos', 
-      action: 'approved purchase request for lab equipment', 
-      time: '2 hours ago', 
+    {
+      user: 'Dr. Maria Santos',
+      action: 'approved memorandum receipt for lab equipment',
+      time: '2 hours ago',
       type: 'purchase',
       priority: 'high'
     },
-    { 
-      user: 'Engr. Juan Dela Cruz', 
-      action: 'borrowed multimedia projector for seminar', 
-      time: '5 hours ago', 
+    {
+      user: 'Engr. Juan Dela Cruz',
+      action: 'borrowed multimedia projector for seminar',
+      time: '5 hours ago',
       type: 'borrow',
       priority: 'medium'
     },
-    { 
-      user: 'Prof. Robert Lim', 
-      action: 'added new Computer Laboratory department', 
-      time: '1 day ago', 
+    {
+      user: 'Prof. Robert Lim',
+      action: 'added new Computer Laboratory department',
+      time: '1 day ago',
       type: 'office',
       priority: 'medium'
     },
-    { 
-      user: 'Admin System', 
-      action: 'automated backup completed successfully', 
-      time: '1 day ago', 
+    {
+      user: 'Admin System',
+      action: 'automated backup completed successfully',
+      time: '1 day ago',
       type: 'system',
       priority: 'low'
     },
   ];
 
   const systemMetrics = [
-    { 
-      metric: 'System Uptime', 
-      value: '99.98%', 
-      icon: <CheckIcon />, 
+    {
+      metric: 'System Uptime',
+      value: '99.98%',
+      icon: <CheckIcon />,
       status: 'excellent',
       trend: '+0.02%'
     },
-    { 
-      metric: 'Response Time', 
-      value: '128ms', 
-      icon: <TrendingIcon />, 
+    {
+      metric: 'Response Time',
+      value: '128ms',
+      icon: <TrendingIcon />,
       status: 'good',
       trend: '-12ms'
     },
-    { 
-      metric: 'Active Sessions', 
-      value: '47', 
-      icon: <UsersIcon />, 
+    {
+      metric: 'Active Sessions',
+      value: '47',
+      icon: <UsersIcon />,
       status: 'normal',
       trend: '+8'
     },
-    { 
-      metric: 'Security Level', 
-      value: 'High', 
-      icon: <SecurityIcon />, 
+    {
+      metric: 'Security Level',
+      value: 'High',
+      icon: <SecurityIcon />,
       status: 'secure',
       trend: 'Optimal'
     },
@@ -341,86 +341,86 @@ const AdminDashboard = () => {
           </Grid>
         )}
 
-<Grid container spacing={4}>
-  {/* Quick Actions */}
-  <Grid item xs={12} lg={6}>
-    <Card sx={unifiedCardSx}>
-      <CardContent sx={{ p: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-          <Typography variant="h5" fontWeight="700" color="#006400">
-            Quick Actions
-          </Typography>
-          <Chip 
-            icon={<ScheduleIcon />} 
-            label="Most Used" 
-            size="small"
-            sx={{ background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)', color: 'white' }}
-          />
-        </Box>
-        <Grid container spacing={2}>
-          {quickActions.map((action, index) => (
-              <Grid item xs={6} key={index}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => navigate(action.path)}
-                sx={{
-                  minHeight: { xs: '140px', sm: '150px' },
-                  height: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-start',
-                  p: 3,
-                  border: '2px solid',
-                  borderColor: 'grey.200',
-                  borderRadius: 2,
-                  color: '#006400',
-                  background: 'white',
-                  textAlign: 'left',
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  whiteSpace: 'normal',
-                  overflowWrap: 'anywhere',
-                  '& .MuiTypography-root': {
-                    whiteSpace: 'normal'
-                  },
-                  '&:hover': {
-                    borderColor: '#006400',
-                    background: 'linear-gradient(135deg, #f8fff8 0%, #f0f8f0 100%)',
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 24px rgba(0, 100, 0, 0.15)'
-                  }
-                }}
-              >
-                <Box sx={{ fontSize: '2rem', mb: 1.5, color: action.color }}>
-                  {action.icon}
-                </Box>
-                <Box sx={{ flex: 1, width: '100%', pr: 3 }}>
-                  <Typography variant="subtitle2" fontWeight="600" sx={{ lineHeight: 1.2, mb: 0.5 }}>
-                    {action.label}
+        <Grid container spacing={4}>
+          {/* Quick Actions */}
+          <Grid item xs={12} lg={6}>
+            <Card sx={unifiedCardSx}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+                  <Typography variant="h5" fontWeight="700" color="#006400">
+                    Quick Actions
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'grey.600', lineHeight: 1.2, display: 'block' }}>
-                    {action.description}
-                  </Typography>
+                  <Chip
+                    icon={<ScheduleIcon />}
+                    label="Most Used"
+                    size="small"
+                    sx={{ background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)', color: 'white' }}
+                  />
                 </Box>
-                <ArrowIcon 
-                  sx={{ 
-                    position: 'absolute', 
-                    bottom: 12, 
-                    right: 12, 
-                    fontSize: '1rem',
-                    color: '#006400',
-                    opacity: 0.7
-                  }} 
-                />
-              </Button>
-            </Grid>
-          ))}
-        </Grid>
-      </CardContent>
-    </Card>
-  </Grid>
+                <Grid container spacing={2}>
+                  {quickActions.map((action, index) => (
+                    <Grid item xs={6} key={index}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => navigate(action.path)}
+                        sx={{
+                          minHeight: { xs: '140px', sm: '150px' },
+                          height: 'auto',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          justifyContent: 'flex-start',
+                          p: 3,
+                          border: '2px solid',
+                          borderColor: 'grey.200',
+                          borderRadius: 2,
+                          color: '#006400',
+                          background: 'white',
+                          textAlign: 'left',
+                          position: 'relative',
+                          transition: 'all 0.3s ease',
+                          whiteSpace: 'normal',
+                          overflowWrap: 'anywhere',
+                          '& .MuiTypography-root': {
+                            whiteSpace: 'normal'
+                          },
+                          '&:hover': {
+                            borderColor: '#006400',
+                            background: 'linear-gradient(135deg, #f8fff8 0%, #f0f8f0 100%)',
+                            transform: 'translateY(-4px)',
+                            boxShadow: '0 12px 24px rgba(0, 100, 0, 0.15)'
+                          }
+                        }}
+                      >
+                        <Box sx={{ fontSize: '2rem', mb: 1.5, color: action.color }}>
+                          {action.icon}
+                        </Box>
+                        <Box sx={{ flex: 1, width: '100%', pr: 3 }}>
+                          <Typography variant="subtitle2" fontWeight="600" sx={{ lineHeight: 1.2, mb: 0.5 }}>
+                            {action.label}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'grey.600', lineHeight: 1.2, display: 'block' }}>
+                            {action.description}
+                          </Typography>
+                        </Box>
+                        <ArrowIcon
+                          sx={{
+                            position: 'absolute',
+                            bottom: 12,
+                            right: 12,
+                            fontSize: '1rem',
+                            color: '#006400',
+                            opacity: 0.7
+                          }}
+                        />
+                      </Button>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
 
           {/* Recent Activities & System Metrics */}
           <Grid item xs={12} lg={6}>
@@ -431,10 +431,10 @@ const AdminDashboard = () => {
                   <Typography variant="h5" fontWeight="700" color="#006400">
                     Recent Activities
                   </Typography>
-                  <Chip 
-                    icon={<TrendingIcon />} 
-                    label="Live Feed" 
-                    color="success" 
+                  <Chip
+                    icon={<TrendingIcon />}
+                    label="Live Feed"
+                    color="success"
                     size="small"
                     variant="outlined"
                   />
@@ -442,10 +442,10 @@ const AdminDashboard = () => {
                 <List sx={{ p: 0 }}>
                   {recentActivities.map((activity, index) => (
                     <ListItem key={index} sx={{ px: 0, py: 1.5 }}>
-                      <Paper 
-                        sx={{ 
-                          p: 2.5, 
-                          width: '100%', 
+                      <Paper
+                        sx={{
+                          p: 2.5,
+                          width: '100%',
                           borderLeft: '4px solid',
                           borderLeftColor: getPriorityColor(activity.priority),
                           background: 'white',
@@ -466,10 +466,10 @@ const AdminDashboard = () => {
                               <Typography variant="subtitle1" fontWeight="600" color="#006400">
                                 {activity.user}
                               </Typography>
-                              <Chip 
-                                label={activity.priority} 
+                              <Chip
+                                label={activity.priority}
                                 size="small"
-                                sx={{ 
+                                sx={{
                                   height: '20px',
                                   fontSize: '0.6rem',
                                   fontWeight: 'bold',
@@ -502,9 +502,9 @@ const AdminDashboard = () => {
                 <Grid container spacing={2}>
                   {systemMetrics.map((metric, index) => (
                     <Grid item xs={6} key={index}>
-                      <Paper 
-                        sx={{ 
-                          p: 3, 
+                      <Paper
+                        sx={{
+                          p: 3,
                           textAlign: 'center',
                           background: 'white',
                           border: '1px solid',
@@ -517,9 +517,9 @@ const AdminDashboard = () => {
                           }
                         }}
                       >
-                        <Box sx={{ 
-                          color: '#006400', 
-                          fontSize: '2.5rem', 
+                        <Box sx={{
+                          color: '#006400',
+                          fontSize: '2.5rem',
                           mb: 2,
                           filter: 'drop-shadow(0 4px 8px rgba(0, 100, 0, 0.1))'
                         }}>
@@ -531,11 +531,11 @@ const AdminDashboard = () => {
                         <Typography variant="body2" sx={{ color: 'grey.600', mb: 1, fontWeight: '500' }}>
                           {metric.metric}
                         </Typography>
-                        <Chip 
-                          label={metric.trend} 
+                        <Chip
+                          label={metric.trend}
                           size="small"
                           color="success"
-                          sx={{ 
+                          sx={{
                             fontSize: '0.6rem',
                             fontWeight: 'bold',
                             height: '20px'

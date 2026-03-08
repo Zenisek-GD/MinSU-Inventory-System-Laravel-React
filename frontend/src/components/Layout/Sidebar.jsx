@@ -37,47 +37,50 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
 
   const getNavItems = () => {
     const baseItems = [
-      { 
-        path: '/dashboard', 
-        icon: <DashboardIcon />, 
-        label: 'Dashboard', 
-        roles: ['admin', 'supply_officer', 'staff'] 
+      {
+        path: '/dashboard',
+        icon: <DashboardIcon />,
+        label: 'Dashboard',
+        roles: ['admin', 'supply_officer', 'staff']
       },
     ];
 
     if (user?.role === 'admin') {
       return [
         ...baseItems,
-        { path: '/offices', icon: <OfficeIcon />, label: 'Manage Offices', roles: ['admin'] },
+        { path: '/locations', icon: <OfficeIcon />, label: 'Locations', roles: ['admin'] },
         { path: '/users', icon: <UsersIcon />, label: 'Manage Users', roles: ['admin'] },
         { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['admin'] },
         { path: '/categories', icon: <CategoryIcon />, label: 'Categories', roles: ['admin'] },
-        { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['admin'] },
+        { path: '/memorandum-receipts', icon: <PurchaseIcon />, label: 'Memorandum Receipts', roles: ['admin'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
-        // merged: inventory removed
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['admin'] },
-        // Reports and QR Scanner removed from sidebar (QR via navbar)
+        { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['admin'] },
       ];
     }
 
     if (user?.role === 'supply_officer') {
       return [
         ...baseItems,
-        { path: '/purchase-requests', icon: <PurchaseIcon />, label: 'Purchase Requests', roles: ['supply_officer'] },
+        { path: '/memorandum-receipts', icon: <PurchaseIcon />, label: 'Memorandum Receipts', roles: ['supply_officer'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
         { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['supply_officer'] },
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['supply_officer'] },
-        // QR Scanner removed from sidebar (available in navbar)
+        { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['supply_officer'] },
       ];
     }
 
     if (user?.role === 'staff') {
       return [
-        ...baseItems,
+        {
+          path: '/staff-dashboard',
+          icon: <DashboardIcon />,
+          label: 'My Dashboard',
+          roles: ['staff']
+        },
+        { path: '/available-items', icon: <CartIcon />, label: 'Browse Items', roles: ['staff'] },
         { path: '/request-item', icon: <AddIcon />, label: 'Request Item', roles: ['staff'] },
-        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrows', roles: ['staff'] },
-        { path: '/available-items', icon: <CartIcon />, label: 'Available Items', roles: ['staff'] },
-        // QR Scanner removed from sidebar (available in navbar)
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Items', roles: ['staff'] },
       ];
     }
 
@@ -89,35 +92,35 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
   const drawer = (
     <Box sx={{ height: '100%', background: 'linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)' }}>
       {/* Header */}
-      <Toolbar 
-        sx={{ 
+      <Toolbar
+        sx={{
           background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)',
           color: 'white',
           boxShadow: '0 2px 8px rgba(0, 100, 0, 0.2)'
         }}
       >
         <Typography variant="h6" noWrap component="div" fontWeight="bold" fontSize="1.1rem">
-          MinSU Inventory
+          MinSU Supply Ops
         </Typography>
       </Toolbar>
-      
+
       <Divider />
-      
+
       {/* User Info */}
       {user && (
         <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
           <Typography variant="subtitle2" fontWeight="bold" color="#006400" fontSize="0.8rem">
-            {user.role === 'admin' ? 'Administrator' : 
-             user.role === 'supply_officer' ? 'Supply Officer' : 'Staff'}
+            {user.role === 'admin' ? 'Administrator' :
+              user.role === 'supply_officer' ? 'Supply Officer' : 'Staff'}
           </Typography>
           <Typography variant="body2" color="text.secondary" fontSize="0.75rem">
             {user.name}
           </Typography>
         </Box>
       )}
-      
+
       {/* Navigation Items */}
-        <List sx={{ px: 1.5, pt: 2 }}>
+      <List sx={{ px: 1.5, pt: 2 }}>
         {navItems.map((item) => (
           <ListItem
             key={item.path}
@@ -150,17 +153,17 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
               },
             }}
           >
-            <ListItemIcon 
-              sx={{ 
-                color: 'inherit', 
+            <ListItemIcon
+              sx={{
+                color: 'inherit',
                 minWidth: 40,
                 transition: 'color 0.2s ease-in-out'
               }}
             >
               {item.icon}
             </ListItemIcon>
-            <ListItemText 
-              primary={item.label} 
+            <ListItemText
+              primary={item.label}
               primaryTypographyProps={{
                 fontSize: '0.9rem',
                 fontWeight: location.pathname === item.path ? '600' : '400'
@@ -185,8 +188,8 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
             width: drawerWidth,
             border: 'none',
           },
@@ -194,14 +197,14 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
       >
         {drawer}
       </Drawer>
-      
+
       {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
         sx={{
           display: { xs: 'none', md: 'block' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
             width: drawerWidth,
             border: 'none',
             boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)',

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { fetchOffices, createOffice, updateOffice, deleteOffice } from "../api/office";
+import { listOffices, createOffice, updateOffice } from "../api/offices";
+import LocationSelector from "../components/LocationSelector";
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import QRCode from "react-qr-code";
 import { 
@@ -18,7 +19,9 @@ import {
   MoreVert,
   ArrowForward,
   CheckCircle,
-  Cancel
+  Cancel,
+  Visibility,
+  QrCode
 } from "@mui/icons-material";
 import {
   Dialog,
@@ -64,22 +67,24 @@ const OfficesPage = () => {
   const [offices, setOffices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState("add"); // "add", "view", "edit"
+  const [selectedOffice, setSelectedOffice] = useState(null);
   const [newOffice, setNewOffice] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [newRooms, setNewRooms] = useState(0);
   const [newLaboratories, setNewLaboratories] = useState(0);
-  const [editing, setEditing] = useState(null);
+  const [newLocationFields, setNewLocationFields] = useState({ college_id: '', department_id: '', room_number: '', building: '', floor: '' });
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editRooms, setEditRooms] = useState(0);
   const [editLaboratories, setEditLaboratories] = useState(0);
+  const [editLocationFields, setEditLocationFields] = useState({ college_id: '', department_id: '', room_number: '', building: '', floor: '' });
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [selectedOffice, setSelectedOffice] = useState(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedOfficeId, setSelectedOfficeId] = useState(null);
 
@@ -90,8 +95,8 @@ const OfficesPage = () => {
   const loadOffices = async () => {
     setLoading(true);
     try {
-      const data = await fetchOffices();
-      setOffices(data.data || []);
+      const data = await listOffices();
+      setOffices(data);
       setError(null);
     } catch (err) {
       setError("Failed to load offices. Please try again.");
@@ -106,59 +111,79 @@ const OfficesPage = () => {
       setError("Office name is required");
       return;
     }
+    if (!newLocationFields.college_id || !newLocationFields.department_id) {
+      setError("College and Department are required");
+      return;
+    }
     try {
-      const created = await createOffice({ 
-        name: newOffice, 
-        description: newDescription, 
+      const created = await createOffice({
+        name: newOffice,
+        description: newDescription,
         location: newLocation,
         rooms: Number(newRooms) || 0,
         laboratories: Number(newLaboratories) || 0,
+        department_id: newLocationFields.department_id,
+        room_number: newLocationFields.room_number,
+        building: newLocationFields.building,
+        floor: newLocationFields.floor,
       });
-      const newOfficeData = created.data?.data || created.data || created;
-      setOffices(prev => [...prev, newOfficeData]);
-      setNewOffice("");
-      setNewDescription("");
-      setNewLocation("");
-      setShowAddModal(false);
-      setNewRooms(0);
-      setNewLaboratories(0);
+      setOffices(prev => [...prev, created]);
+      resetAddForm();
+      setShowModal(false);
       setError(null);
     } catch {
       setError("Failed to create office");
     }
   };
 
-  const handleEdit = (office) => {
-    setEditing(office.id);
+  const handleViewOffice = (office) => {
+    setSelectedOffice(office);
+    setModalMode("view");
+    setShowModal(true);
+  };
+
+  const handleEditOffice = (office) => {
+    setSelectedOffice(office);
     setEditName(office.name);
     setEditDescription(office.description || "");
     setEditLocation(office.location || "");
     setEditRooms(office.rooms || 0);
     setEditLaboratories(office.laboratories || 0);
+    setEditLocationFields({
+      college_id: office.department?.college?.id || '',
+      department_id: office.department?.id || '',
+      room_number: office.room_number || '',
+      building: office.building || '',
+      floor: office.floor || '',
+    });
+    setModalMode("edit");
+    setShowModal(true);
   };
 
-  const handleUpdate = async (id) => {
+  const handleUpdate = async () => {
     if (!editName.trim()) {
       setError("Office name is required");
       return;
     }
+    if (!editLocationFields.college_id || !editLocationFields.department_id) {
+      setError("College and Department are required");
+      return;
+    }
     try {
-      const updated = await updateOffice(id, { 
-        name: editName, 
-        description: editDescription, 
+      const updated = await updateOffice(selectedOffice.id, {
+        name: editName,
+        description: editDescription,
         location: editLocation,
         rooms: Number(editRooms) || 0,
         laboratories: Number(editLaboratories) || 0,
+        department_id: editLocationFields.department_id,
+        room_number: editLocationFields.room_number,
+        building: editLocationFields.building,
+        floor: editLocationFields.floor,
       });
-      const updatedOfficeData = updated.data?.data || updated.data || updated;
-      setOffices(prev => prev.map(o => o.id === id ? updatedOfficeData : o));
-      setEditing(null);
-      setEditName("");
-      setEditDescription("");
-      setEditLocation("");
-      setEditRooms(0);
-      setEditLaboratories(0);
-      setSelectedOffice(null);
+      setOffices(prev => prev.map(o => o.id === selectedOffice.id ? updated : o));
+      setSelectedOffice(updated);
+      setModalMode("view");
       setError(null);
     } catch {
       setError("Failed to update office");
@@ -170,7 +195,10 @@ const OfficesPage = () => {
     try {
       await deleteOffice(id);
       setOffices(prev => prev.filter(o => o.id !== id));
-      setSelectedOffice(null);
+      if (selectedOffice?.id === id) {
+        setSelectedOffice(null);
+        setShowModal(false);
+      }
     } catch {
       setError("Failed to delete office");
     }
@@ -182,6 +210,7 @@ const OfficesPage = () => {
     setNewLocation("");
     setNewRooms(0);
     setNewLaboratories(0);
+    setNewLocationFields({ college_id: '', department_id: '', room_number: '', building: '', floor: '' });
     setError(null);
   };
 
@@ -216,6 +245,30 @@ const OfficesPage = () => {
     console.log("Download QR for:", office.name);
   };
 
+  const handleAddOfficeClick = () => {
+    resetAddForm();
+    setModalMode("add");
+    setShowModal(true);
+  };
+
+  const getModalTitle = () => {
+    switch (modalMode) {
+      case "add": return "Add New Office";
+      case "edit": return "Edit Office";
+      case "view": return "Office Details";
+      default: return "Office";
+    }
+  };
+
+  const getModalIcon = () => {
+    switch (modalMode) {
+      case "add": return <Add />;
+      case "edit": return <Edit />;
+      case "view": return <Visibility />;
+      default: return <Business />;
+    }
+  };
+
   return (
     <DashboardLayout>
       <Box sx={{ p: 4 }}>
@@ -237,16 +290,13 @@ const OfficesPage = () => {
                 Office Management
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Manage office locations, generate QR codes, and track facilities
+                Manage office rooms per department (Admin, Cashier, Registrar, Supply, etc.)
               </Typography>
             </Box>
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => {
-                resetAddForm();
-                setShowAddModal(true);
-              }}
+              onClick={handleAddOfficeClick}
               sx={{
                 px: 4,
                 py: 1.5,
@@ -424,482 +474,204 @@ const OfficesPage = () => {
           </Card>
         </Box>
 
-        {/* Main Content */}
-        <Grid container spacing={4}>
-          {/* Offices Table */}
-          <Grid item xs={12} lg={8}>
-            <Card 
-              elevation={0}
-              sx={{
-                borderRadius: 3,
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                overflow: 'hidden'
-              }}
-            >
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-                  <CircularProgress />
-                </Box>
-              ) : error && !showAddModal ? (
-                <Alert severity="error" sx={{ m: 3 }}>
-                  {error}
-                </Alert>
-              ) : filteredOffices.length === 0 ? (
-                <Box sx={{ textAlign: 'center', p: 8 }}>
-                  <Box
-                    sx={{
-                      display: 'inline-flex',
-                      p: 3,
-                      borderRadius: '50%',
-                      bgcolor: alpha(theme.palette.divider, 0.1),
-                      mb: 3
-                    }}
-                  >
-                    <Business sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.3) }} />
-                  </Box>
-                  <Typography variant="h6" color="text.secondary" gutterBottom fontWeight={600}>
-                    No Offices Found
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-                    {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first office'}
-                  </Typography>
-                  {!searchTerm && (
-                    <Button
-                      variant="contained"
-                      startIcon={<Add />}
-                      onClick={() => setShowAddModal(true)}
-                      sx={{
-                        px: 4,
-                        borderRadius: 3
-                      }}
-                    >
-                      Add First Office
-                    </Button>
-                  )}
-                </Box>
-              ) : (
-                <>
-                  <TableContainer>
-                    <Table>
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
-                          <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Office</TableCell>
-                          <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Location</TableCell>
-                          <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Facilities</TableCell>
-                          <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>QR Code</TableCell>
-                          <TableCell sx={{ fontWeight: 700, color: 'text.secondary', textAlign: 'right' }}>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredOffices
-                          .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                          .map((office) => (
-                            <TableRow 
-                              key={office.id} 
-                              hover 
-                              sx={{ 
-                                cursor: 'pointer',
-                                bgcolor: selectedOffice?.id === office.id ? alpha(theme.palette.primary.main, 0.04) : 'inherit',
-                                '&:hover': {
-                                  bgcolor: alpha(theme.palette.primary.main, 0.02)
-                                }
-                              }}
-                              onClick={() => setSelectedOffice(office)}
-                            >
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                  <Avatar
-                                    sx={{
-                                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                      color: theme.palette.primary.main
-                                    }}
-                                  >
-                                    {office.name.charAt(0)}
-                                  </Avatar>
-                                  <Box>
-                                    <Typography variant="subtitle1" fontWeight={600}>
-                                      {office.name}
-                                    </Typography>
-                                    {office.description && (
-                                      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }}>
-                                        {office.description.length > 50 
-                                          ? `${office.description.substring(0, 50)}...` 
-                                          : office.description}
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                {office.location ? (
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <LocationOn fontSize="small" sx={{ color: 'text.secondary' }} />
-                                    <Typography variant="body2">
-                                      {office.location}
-                                    </Typography>
-                                  </Box>
-                                ) : (
-                                  <Typography variant="body2" color="text.secondary">
-                                    Not specified
-                                  </Typography>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Stack direction="row" spacing={1}>
-                                  {office.rooms > 0 && (
-                                    <Chip
-                                      label={`${office.rooms} Rooms`}
-                                      size="small"
-                                      icon={<MeetingRoom fontSize="small" />}
-                                      sx={{ bgcolor: alpha(theme.palette.info.main, 0.1) }}
-                                    />
-                                  )}
-                                  {office.laboratories > 0 && (
-                                    <Chip
-                                      label={`${office.laboratories} Labs`}
-                                      size="small"
-                                      icon={<Science fontSize="small" />}
-                                      sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1) }}
-                                    />
-                                  )}
-                                </Stack>
-                              </TableCell>
-                              <TableCell>
-                                {office.qr_code ? (
-                                  <Tooltip title="Click to view QR">
-                                    <Box
-                                      sx={{
-                                        p: 0.5,
-                                        bgcolor: 'white',
-                                        borderRadius: 2,
-                                        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-                                        display: 'inline-block',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      <QRCode value={office.qr_code} size={40} />
-                                    </Box>
-                                  </Tooltip>
-                                ) : (
-                                  <Typography variant="caption" color="text.secondary">
-                                    Not generated
-                                  </Typography>
-                                )}
-                              </TableCell>
-                              <TableCell align="right">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => handleActionMenuOpen(e, office.id)}
-                                  sx={{ color: 'text.secondary' }}
-                                >
-                                  <MoreVert />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
-                    component="div"
-                    count={filteredOffices.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                  />
-                </>
+        {/* Main Content - Full Width Table */}
+        <Card 
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            overflow: 'hidden'
+          }}
+        >
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ m: 3 }}>
+              {error}
+            </Alert>
+          ) : filteredOffices.length === 0 ? (
+            <Box sx={{ textAlign: 'center', p: 8 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  p: 3,
+                  borderRadius: '50%',
+                  bgcolor: alpha(theme.palette.divider, 0.1),
+                  mb: 3
+                }}
+              >
+                <Business sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.3) }} />
+              </Box>
+              <Typography variant="h6" color="text.secondary" gutterBottom fontWeight={600}>
+                No Offices Found
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+                {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first office'}
+              </Typography>
+              {!searchTerm && (
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={handleAddOfficeClick}
+                  sx={{
+                    px: 4,
+                    borderRadius: 3
+                  }}
+                >
+                  Add First Office
+                </Button>
               )}
-            </Card>
-          </Grid>
-
-          {/* Side Panel - Office Details/Edit */}
-          <Grid item xs={12} lg={4}>
-            <Card 
-              elevation={0}
-              sx={{
-                borderRadius: 3,
-                border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                height: '100%'
-              }}
-            >
-              <CardContent sx={{ p: 4 }}>
-                {!selectedOffice ? (
-                  <Box sx={{ textAlign: 'center', py: 8 }}>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        p: 3,
-                        borderRadius: '50%',
-                        bgcolor: alpha(theme.palette.divider, 0.1),
-                        mb: 3
-                      }}
-                    >
-                      <Info sx={{ fontSize: 48, color: alpha(theme.palette.text.secondary, 0.3) }} />
-                    </Box>
-                    <Typography variant="h6" color="text.secondary" gutterBottom fontWeight={600}>
-                      Select an Office
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Click on an office row to view and edit details
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Fade in={!!selectedOffice}>
-                    <Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                        <Box>
-                          <Typography variant="h5" fontWeight={800} gutterBottom>
-                            {editing === selectedOffice.id ? 'Edit Office' : selectedOffice.name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Office details and management
-                          </Typography>
-                        </Box>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => setSelectedOffice(null)}
-                          sx={{ color: 'text.secondary' }}
+            </Box>
+          ) : (
+            <>
+              <TableContainer>
+                <Table sx={{ minWidth: 1000 }}>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                      <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Office Name</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Department</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'text.secondary' }}>Room Details</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'text.secondary', textAlign: 'right' }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredOffices
+                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                      .map((office) => (
+                        <TableRow 
+                          key={office.id} 
+                          hover 
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.primary.main, 0.02)
+                            }
+                          }}
+                          onClick={() => handleViewOffice(office)}
                         >
-                          <Close fontSize="small" />
-                        </IconButton>
-                      </Box>
-
-                      {editing === selectedOffice.id ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <TextField
-                            fullWidth
-                            label="Office Name"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                          />
-                          <TextField
-                            fullWidth
-                            label="Description"
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            multiline
-                            rows={3}
-                            variant="outlined"
-                            size="small"
-                          />
-                          <TextField
-                            fullWidth
-                            label="Location"
-                            value={editLocation}
-                            onChange={(e) => setEditLocation(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <LocationOn fontSize="small" />
-                                </InputAdornment>
-                              ),
-                            }}
-                          />
-                          <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                              <TextField
-                                fullWidth
-                                type="number"
-                                label="Rooms"
-                                value={editRooms}
-                                onChange={(e) => setEditRooms(e.target.value)}
-                                variant="outlined"
-                                size="small"
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <MeetingRoom fontSize="small" />
-                                    </InputAdornment>
-                                  ),
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Avatar
+                                sx={{
+                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                  color: theme.palette.primary.main,
+                                  fontWeight: 600
                                 }}
-                              />
-                            </Grid>
-                            <Grid item xs={6}>
-                              <TextField
-                                fullWidth
-                                type="number"
-                                label="Laboratories"
-                                value={editLaboratories}
-                                onChange={(e) => setEditLaboratories(e.target.value)}
-                                variant="outlined"
-                                size="small"
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <Science fontSize="small" />
-                                    </InputAdornment>
-                                  ),
-                                }}
-                              />
-                            </Grid>
-                          </Grid>
-                          <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                            <Button
-                              fullWidth
-                              variant="outlined"
-                              onClick={() => setEditing(null)}
-                              sx={{ borderRadius: 2 }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              fullWidth
-                              variant="contained"
-                              onClick={() => handleUpdate(selectedOffice.id)}
-                              sx={{ 
-                                borderRadius: 2,
-                                bgcolor: theme.palette.primary.main
-                              }}
-                            >
-                              Save Changes
-                            </Button>
-                          </Stack>
-                        </Box>
-                      ) : (
-                        <>
-                          {/* QR Code Preview */}
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              p: 3,
-                              mb: 4,
-                              borderRadius: 3,
-                              bgcolor: alpha(theme.palette.primary.main, 0.05),
-                              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                              textAlign: 'center'
-                            }}
-                          >
-                            {selectedOffice.qr_code ? (
-                              <>
-                                <Box sx={{ mb: 2 }}>
-                                  <QRCode 
-                                    value={selectedOffice.qr_code} 
-                                    size={120} 
-                                    style={{ margin: '0 auto' }}
-                                  />
-                                </Box>
-                                <Typography variant="caption" color="text.secondary">
-                                  Scan to view office details
+                              >
+                                {office.name.charAt(0)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>
+                                  {office.name}
                                 </Typography>
-                              </>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                QR code not generated
-                              </Typography>
-                            )}
-                          </Paper>
-
-                          {/* Office Details */}
-                          <Stack spacing={2}>
-                            <Box>
-                              <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                                DESCRIPTION
-                              </Typography>
-                              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                {selectedOffice.description || 'No description provided'}
-                              </Typography>
-                            </Box>
-                            
-                            <Box>
-                              <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                                LOCATION
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                <LocationOn fontSize="small" sx={{ color: 'text.secondary' }} />
-                                <Typography variant="body2">
-                                  {selectedOffice.location || 'Not specified'}
+                                <Typography variant="caption" color="text.secondary">
+                                  {office.description || 'No description'}
                                 </Typography>
                               </Box>
                             </Box>
-
-                            <Grid container spacing={2}>
-                              <Grid item xs={6}>
-                                <Paper
-                                  elevation={0}
-                                  sx={{
-                                    p: 2,
-                                    borderRadius: 2,
-                                    bgcolor: alpha(theme.palette.info.main, 0.05),
-                                    border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
-                                  }}
-                                >
-                                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                                    ROOMS
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={office.department?.name || 'No Department'}
+                              size="small"
+                              icon={<MeetingRoom fontSize="small" />}
+                              sx={{ 
+                                bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                color: theme.palette.secondary.dark,
+                                fontWeight: 500
+                              }}
+                            />
+                            {office.department?.college && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                {office.department.college.name}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Stack spacing={0.5}>
+                              {office.room_number && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="caption" sx={{ minWidth: 60 }}>
+                                    Room:
                                   </Typography>
-                                  <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
-                                    {selectedOffice.rooms || 0}
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {office.room_number}
                                   </Typography>
-                                </Paper>
-                              </Grid>
-                              <Grid item xs={6}>
-                                <Paper
-                                  elevation={0}
-                                  sx={{
-                                    p: 2,
-                                    borderRadius: 2,
-                                    bgcolor: alpha(theme.palette.warning.main, 0.05),
-                                    border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`
-                                  }}
-                                >
-                                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                                    LABORATORIES
+                                </Box>
+                              )}
+                              {office.building && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="caption" sx={{ minWidth: 60 }}>
+                                    Building:
                                   </Typography>
-                                  <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
-                                    {selectedOffice.laboratories || 0}
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {office.building}
                                   </Typography>
-                                </Paper>
-                              </Grid>
-                            </Grid>
-
-                            {/* Action Buttons */}
-                            <Stack spacing={1} sx={{ mt: 4 }}>
-                              <Button
-                                fullWidth
-                                variant="contained"
-                                startIcon={<Edit />}
-                                onClick={() => handleEdit(selectedOffice)}
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Edit Office
-                              </Button>
-                              <Button
-                                fullWidth
-                                variant="outlined"
-                                startIcon={<Download />}
-                                onClick={() => handleDownloadQR(selectedOffice)}
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Download QR Code
-                              </Button>
+                                </Box>
+                              )}
+                              {office.floor && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="caption" sx={{ minWidth: 60 }}>
+                                    Floor:
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {office.floor}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {!office.room_number && !office.building && !office.floor && (
+                                <Typography variant="caption" color="text.secondary">
+                                  No details
+                                </Typography>
+                              )}
                             </Stack>
-                          </Stack>
-                        </>
-                      )}
-                    </Box>
-                  </Fade>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleActionMenuOpen(e, office.id)}
+                              sx={{ color: 'text.secondary' }}
+                            >
+                              <MoreVert />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[5, 10, 25]}
+                component="div"
+                count={filteredOffices.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+              />
+            </>
+          )}
+        </Card>
       </Box>
 
-      {/* Add Office Modal */}
+      {/* Office Modal */}
       <Dialog 
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        maxWidth="sm"
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          if (modalMode === "edit") {
+            setModalMode("view");
+          }
+        }}
+        maxWidth="md"
         fullWidth
         PaperProps={{
           sx: { 
             borderRadius: 4,
-            overflow: 'hidden'
+            overflow: 'hidden',
+            maxHeight: '90vh'
           }
         }}
       >
@@ -907,29 +679,44 @@ const OfficesPage = () => {
           pb: 2, 
           borderBottom: 1, 
           borderColor: 'divider',
-          bgcolor: alpha(theme.palette.primary.main, 0.05)
+          bgcolor: alpha(
+            modalMode === "add" ? theme.palette.primary.main : 
+            modalMode === "edit" ? theme.palette.warning.main :
+            theme.palette.info.main, 
+            0.05
+          )
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Avatar
                 sx={{
-                  bgcolor: theme.palette.primary.main,
+                  bgcolor: 
+                    modalMode === "add" ? theme.palette.primary.main : 
+                    modalMode === "edit" ? theme.palette.warning.main :
+                    theme.palette.info.main,
                   color: 'white'
                 }}
               >
-                <Add />
+                {getModalIcon()}
               </Avatar>
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: theme.palette.primary.main }}>
-                  Add New Office
+                <Typography variant="h5" sx={{ fontWeight: 800, color: theme.palette.text.primary }}>
+                  {getModalTitle()}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Create a new office location
+                  {modalMode === "add" ? "Create a new office location" :
+                   modalMode === "edit" ? "Modify office details" :
+                   "View office information and QR code"}
                 </Typography>
               </Box>
             </Box>
             <IconButton 
-              onClick={() => setShowAddModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                if (modalMode === "edit") {
+                  setModalMode("view");
+                }
+              }}
               size="small"
               sx={{ color: 'text.secondary' }}
             >
@@ -938,84 +725,157 @@ const OfficesPage = () => {
           </Box>
         </DialogTitle>
         
-        <form onSubmit={handleCreate}>
-          <DialogContent sx={{ pt: 4 }}>
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
-            
+        <DialogContent sx={{ pt: 4, overflow: 'auto' }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+          
+          {modalMode === "add" ? (
+            <form onSubmit={handleCreate}>
+              <Stack spacing={3}>
+                <TextField
+                  fullWidth
+                  label="Office Name"
+                  value={newOffice}
+                  onChange={e => setNewOffice(e.target.value)}
+                  placeholder="Enter office name"
+                  autoFocus
+                  required
+                  variant="outlined"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Business />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <LocationSelector value={newLocationFields} onChange={setNewLocationFields} />
+                <TextField
+                  fullWidth
+                  label="Description"
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  placeholder="Enter description"
+                  multiline
+                  rows={3}
+                  variant="outlined"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Info />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Location"
+                  value={newLocation}
+                  onChange={e => setNewLocation(e.target.value)}
+                  placeholder="Enter location"
+                  variant="outlined"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Rooms"
+                      value={newRooms}
+                      onChange={e => setNewRooms(e.target.value)}
+                      placeholder="Number of rooms"
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <MeetingRoom />
+                          </InputAdornment>
+                        ),
+                        inputProps: { min: 0 }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Laboratories"
+                      value={newLaboratories}
+                      onChange={e => setNewLaboratories(e.target.value)}
+                      placeholder="Number of laboratories"
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Science />
+                          </InputAdornment>
+                        ),
+                        inputProps: { min: 0 }
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Stack>
+            </form>
+          ) : modalMode === "edit" ? (
             <Stack spacing={3}>
               <TextField
                 fullWidth
                 label="Office Name"
-                value={newOffice}
-                onChange={e => setNewOffice(e.target.value)}
-                placeholder="Enter office name"
-                autoFocus
-                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
                 variant="outlined"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Business />
-                    </InputAdornment>
-                  ),
-                }}
+                autoFocus
               />
-              
+              <LocationSelector value={editLocationFields} onChange={setEditLocationFields} />
               <TextField
                 fullWidth
                 label="Description"
-                value={newDescription}
-                onChange={e => setNewDescription(e.target.value)}
-                placeholder="Enter description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
                 multiline
                 rows={3}
                 variant="outlined"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Info />
-                    </InputAdornment>
-                  ),
-                }}
               />
-              
               <TextField
                 fullWidth
                 label="Location"
-                value={newLocation}
-                onChange={e => setNewLocation(e.target.value)}
-                placeholder="Enter location"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
                 variant="outlined"
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LocationOn />
+                      <LocationOn fontSize="small" />
                     </InputAdornment>
                   ),
                 }}
               />
-              
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <TextField
                     fullWidth
                     type="number"
                     label="Rooms"
-                    value={newRooms}
-                    onChange={e => setNewRooms(e.target.value)}
-                    placeholder="Number of rooms"
+                    value={editRooms}
+                    onChange={(e) => setEditRooms(e.target.value)}
                     variant="outlined"
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <MeetingRoom />
+                          <MeetingRoom fontSize="small" />
                         </InputAdornment>
                       ),
-                      inputProps: { min: 0 }
                     }}
                   />
                 </Grid>
@@ -1024,56 +884,292 @@ const OfficesPage = () => {
                     fullWidth
                     type="number"
                     label="Laboratories"
-                    value={newLaboratories}
-                    onChange={e => setNewLaboratories(e.target.value)}
-                    placeholder="Number of laboratories"
+                    value={editLaboratories}
+                    onChange={(e) => setEditLaboratories(e.target.value)}
                     variant="outlined"
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Science />
+                          <Science fontSize="small" />
                         </InputAdornment>
                       ),
-                      inputProps: { min: 0 }
                     }}
                   />
                 </Grid>
               </Grid>
             </Stack>
-          </DialogContent>
-          
-          <DialogActions sx={{ 
-            p: 3, 
-            borderTop: 1, 
-            borderColor: 'divider',
-            bgcolor: alpha(theme.palette.background.default, 0.5)
-          }}>
-            <Button
-              onClick={() => setShowAddModal(false)}
-              variant="outlined"
-              sx={{ 
-                px: 4,
-                borderRadius: 2,
-                fontWeight: 600
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              sx={{ 
-                px: 4,
-                borderRadius: 2,
-                fontWeight: 600,
-                bgcolor: theme.palette.primary.main,
-                '&:hover': { bgcolor: theme.palette.primary.dark }
-              }}
-            >
-              Create Office
-            </Button>
-          </DialogActions>
-        </form>
+          ) : selectedOffice && (
+            <Grid container spacing={4}>
+              {/* Left Column - Office Details */}
+              <Grid item xs={12} md={6}>
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      OFFICE NAME
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
+                      {selectedOffice.name}
+                    </Typography>
+                  </Box>
+                  
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      DESCRIPTION
+                    </Typography>
+                    <Typography variant="body1" sx={{ mt: 0.5 }}>
+                      {selectedOffice.description || 'No description provided'}
+                    </Typography>
+                  </Box>
+                  
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      LOCATION
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                      <LocationOn sx={{ color: 'text.secondary' }} />
+                      <Typography variant="body1">
+                        {selectedOffice.location || 'Not specified'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          borderRadius: 3,
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                          <MeetingRoom sx={{ color: theme.palette.info.main }} />
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                            ROOMS
+                          </Typography>
+                        </Box>
+                        <Typography variant="h3" fontWeight={800}>
+                          {selectedOffice.rooms || 0}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          borderRadius: 3,
+                          bgcolor: alpha(theme.palette.warning.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                          <Science sx={{ color: theme.palette.warning.main }} />
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                            LABORATORIES
+                          </Typography>
+                        </Box>
+                        <Typography variant="h3" fontWeight={800}>
+                          {selectedOffice.laboratories || 0}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </Stack>
+              </Grid>
+
+              {/* Right Column - QR Code */}
+              <Grid item xs={12} md={6}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                    textAlign: 'center',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {selectedOffice.qr_code ? (
+                    <>
+                      <Box sx={{ mb: 3 }}>
+                        <QRCode 
+                          value={selectedOffice.qr_code} 
+                          size={200} 
+                          style={{ margin: '0 auto' }}
+                        />
+                      </Box>
+                      <Typography variant="h6" fontWeight={600} gutterBottom>
+                        Office QR Code
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 300 }}>
+                        Scan this QR code to view office details or share location information
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        startIcon={<Download />}
+                        onClick={() => handleDownloadQR(selectedOffice)}
+                        sx={{ 
+                          borderRadius: 2,
+                          px: 4,
+                          bgcolor: theme.palette.primary.main
+                        }}
+                      >
+                        Download QR Code
+                      </Button>
+                    </>
+                  ) : (
+                    <Box>
+                      <Box
+                        sx={{
+                          display: 'inline-flex',
+                          p: 3,
+                          borderRadius: '50%',
+                          bgcolor: alpha(theme.palette.divider, 0.1),
+                          mb: 3
+                        }}
+                      >
+                        <QrCode sx={{ fontSize: 64, color: alpha(theme.palette.text.secondary, 0.3) }} />
+                      </Box>
+                      <Typography variant="h6" fontWeight={600} gutterBottom>
+                        QR Code Not Generated
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 300 }}>
+                        Generate a QR code for this office to enable quick access and sharing
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        startIcon={<QrCode />}
+                        sx={{ borderRadius: 2, px: 4 }}
+                      >
+                        Generate QR Code
+                      </Button>
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          borderTop: 1, 
+          borderColor: 'divider',
+          bgcolor: alpha(theme.palette.background.default, 0.5)
+        }}>
+          {modalMode === "add" ? (
+            <>
+              <Button
+                onClick={() => setShowModal(false)}
+                variant="outlined"
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                onClick={handleCreate}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  bgcolor: theme.palette.primary.main,
+                  '&:hover': { bgcolor: theme.palette.primary.dark }
+                }}
+              >
+                Create Office
+              </Button>
+            </>
+          ) : modalMode === "edit" ? (
+            <>
+              <Button
+                onClick={() => {
+                  setModalMode("view");
+                  // Reset to original values
+                  setEditName(selectedOffice.name);
+                  setEditDescription(selectedOffice.description || "");
+                  setEditLocation(selectedOffice.location || "");
+                  setEditRooms(selectedOffice.rooms || 0);
+                  setEditLaboratories(selectedOffice.laboratories || 0);
+                }}
+                variant="outlined"
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleUpdate}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  bgcolor: theme.palette.warning.main,
+                  '&:hover': { bgcolor: theme.palette.warning.dark }
+                }}
+              >
+                Save Changes
+              </Button>
+            </>
+          ) : selectedOffice && (
+            <>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => handleDelete(selectedOffice.id)}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600
+                }}
+              >
+                Delete
+              </Button>
+              <Box sx={{ flex: 1 }} />
+              <Button
+                variant="outlined"
+                onClick={() => setShowModal(false)}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600
+                }}
+              >
+                Close
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<Edit />}
+                onClick={() => handleEditOffice(selectedOffice)}
+                sx={{ 
+                  px: 4,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  bgcolor: theme.palette.primary.main
+                }}
+              >
+                Edit Office
+              </Button>
+            </>
+          )}
+        </DialogActions>
       </Dialog>
 
       {/* Action Menu */}
@@ -1090,7 +1186,17 @@ const OfficesPage = () => {
       >
         <MenuItem onClick={() => {
           const office = offices.find(o => o.id === selectedOfficeId);
-          if (office) handleEdit(office);
+          if (office) handleViewOffice(office);
+          handleActionMenuClose();
+        }}>
+          <ListItemIcon>
+            <Visibility fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>View Details</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => {
+          const office = offices.find(o => o.id === selectedOfficeId);
+          if (office) handleEditOffice(office);
           handleActionMenuClose();
         }}>
           <ListItemIcon>

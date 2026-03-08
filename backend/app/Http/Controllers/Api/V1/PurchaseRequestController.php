@@ -38,7 +38,7 @@ class PurchaseRequestController extends Controller
             $query->where('requested_by', $request->requested_by);
         }
 
-        $purchaseRequests = $query->latest()->get();
+        $purchaseRequests = $query->latest()->paginate(50);
 
         return response()->json($purchaseRequests);
     }
@@ -76,7 +76,7 @@ class PurchaseRequestController extends Controller
                 'office_id' => $request->office_id,
                 'requested_by' => $request->user()->id,
                 'purpose' => $request->purpose,
-                'status' => 'Pending',
+                'status' => 'Draft',
                 'total_estimated_cost' => 0,
             ]);
 
@@ -204,16 +204,16 @@ class PurchaseRequestController extends Controller
         }
     }
 
-    public function destroy(PurchaseRequest $purchaseRequest)
+    public function destroy(PurchaseRequest $purchaseRequestRecord)
     {
-        // Only allow deletion for draft PRs
-        if ($purchaseRequest->status !== 'Draft') {
+        // Only allow deletion for draft and pending PRs
+        if (!in_array($purchaseRequestRecord->status, ['Draft', 'Pending'])) {
             return response()->json([
                 'message' => 'Cannot delete purchase request in current status'
             ], 422);
         }
 
-        $purchaseRequest->delete();
+        $purchaseRequestRecord->delete();
 
         return response()->json(['message' => 'Purchase request deleted successfully']);
     }
@@ -241,6 +241,37 @@ class PurchaseRequestController extends Controller
 
         return response()->json([
             'message' => 'Purchase request approved successfully. Items can now be received into inventory.',
+            'purchase_request' => $purchaseRequestRecord
+        ]);
+    }
+
+    /**
+     * Submit a draft purchase request (transition from Draft to Pending)
+     */
+    public function submit(Request $request, PurchaseRequest $purchaseRequestRecord)
+    {
+        if ($purchaseRequestRecord->status !== 'Draft') {
+            return response()->json([
+                'message' => 'Only draft purchase requests can be submitted',
+                'current_status' => $purchaseRequestRecord->status
+            ], 422);
+        }
+
+        // Validate that the PR has at least one item before submitting
+        if ($purchaseRequestRecord->items()->count() === 0) {
+            return response()->json([
+                'message' => 'Cannot submit purchase request without items'
+            ], 422);
+        }
+
+        $purchaseRequestRecord->update([
+            'status' => 'Pending',
+        ]);
+
+        $purchaseRequestRecord->load(['office', 'requestedBy', 'items']);
+
+        return response()->json([
+            'message' => 'Purchase request submitted successfully. It is now pending approval.',
             'purchase_request' => $purchaseRequestRecord
         ]);
     }

@@ -19,17 +19,17 @@ export default function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      await login(formData);
-      const profile = await getProfile();
-      setUser(profile.data.data.user);
+      const loginRes = await login(formData);
+      console.log('Login response:', loginRes);
+      const profileRes = await getProfile();
+      console.log('Profile response:', profileRes);
+      const userData = profileRes.data?.user || profileRes.user;
+      setUser(userData);
       navigate("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
-      if (err.response) {
-        setError(err.response.data?.message || "Login failed (API error)");
-      } else {
-        setError("Login failed (unknown error)");
-      }
+      const errorMessage = err.message || err.error || err.data?.message || "Login failed";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -41,9 +41,9 @@ export default function LoginForm() {
         <div className="w-2/5 bg-gradient-to-b from-[#006400] to-[#004d00] p-12 flex flex-col justify-between text-white">
           <div className="flex flex-col items-center text-center">
             <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-amber-400 p-3 mb-6">
-              <img 
-                src="src/assets/minsu-logo.png" 
-                alt="MinSU Logo" 
+              <img
+                src="src/assets/minsu-logo.png"
+                alt="MinSU Logo"
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   e.target.style.display = 'none';
@@ -52,12 +52,12 @@ export default function LoginForm() {
               />
               <span className="text-[#006400] font-bold text-3xl hidden">M</span>
             </div>
-            
+
             <h1 className="text-3xl font-bold mb-2">Mindoro State University</h1>
-            <p className="text-amber-200 text-lg font-medium mb-8">Inventory Management System</p>
-            
+            <p className="text-amber-200 text-lg font-medium mb-8">Real-Time Supply Operations Management</p>
+
             <div className="w-20 h-1 bg-amber-400 rounded-full mb-8"></div>
-            
+
             <div className="space-y-4 text-amber-100">
               <div className="flex items-center justify-center space-x-3">
                 <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
@@ -69,7 +69,7 @@ export default function LoginForm() {
                 <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-sm">✓</span>
                 </div>
-                <span>Manage Purchase Requests</span>
+                <span>Manage Memorandum Receipts</span>
               </div>
               <div className="flex items-center justify-center space-x-3">
                 <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
@@ -79,7 +79,7 @@ export default function LoginForm() {
               </div>
             </div>
           </div>
-          
+
           <div className="text-center">
             <p className="text-amber-200 text-sm">
               Efficient • Secure • Reliable
@@ -179,15 +179,15 @@ export default function LoginForm() {
               <div className="text-center">
                 <p className="text-gray-600 text-sm">
                   For account assistance, contact the <br />
-                  <a 
-                    href="/contact" 
+                  <a
+                    href="/contact"
                     className="text-[#006400] hover:text-[#004d00] font-bold transition-colors duration-200 text-base"
                   >
                     System Administrator
                   </a>
                 </p>
                 <p className="text-gray-500 text-xs mt-3">
-                  MinSU Inventory System v2.0 • Secure Access
+                  MinSU Real-Time Supply Operations Management System • Secure Access
                 </p>
               </div>
             </div>
