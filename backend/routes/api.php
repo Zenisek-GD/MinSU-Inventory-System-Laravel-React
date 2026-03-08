@@ -110,5 +110,10 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/purchase-requests', [ReportsController::class, 'purchaseRequestsReport']);
         Route::get('reports/stock-levels', [ReportsController::class, 'stockLevelsReport']);
         Route::get('reports/alerts', [ReportsController::class, 'notificationAlerts']);
+
+        // Notification routes
+        Route::get('notifications', [ReportsController::class, 'getUserNotifications']);
+        Route::put('notifications/{id}/read', [ReportsController::class, 'markNotificationRead']);
+        Route::put('notifications/mark-all-read', [ReportsController::class, 'markAllNotificationsRead']);
     });
 });

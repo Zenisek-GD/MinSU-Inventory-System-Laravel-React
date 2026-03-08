@@ -64,6 +64,10 @@ const Navbar = ({ onMenuToggle }) => {
       case 'borrow_approved': return <CheckCircleIcon />;
       case 'borrow_rejected': return <CloseIcon />;
       case 'return_reminder': return <ScheduleIcon />;
+      case 'mr_created': return <AssignmentIcon />;
+      case 'mr_approved': return <CheckCircleIcon />;
+      case 'mr_rejected': return <CloseIcon />;
+      case 'mr_pending_approval': return <WarningIcon />;
       default: return <InfoIcon />;
     }
   };
@@ -72,17 +76,57 @@ const Navbar = ({ onMenuToggle }) => {
     try {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
 
+      let allNotifications = [];
+
       if (user?.role === 'admin' || user?.role === 'supply_officer') {
-        // Use the aggregated alerts endpoint (pending borrows + overdue + low-stock + maintenance)
-        const res = await fetchNotificationAlerts();
-        const alerts = (res?.data || []).map(a => ({
+        // Fetch both types of notifications for admins and supply officers
+        const alertRes = await fetchNotificationAlerts();
+        const alerts = (alertRes?.data || []).map(a => ({
           ...a,
           time: a.time ? new Date(a.time) : new Date(),
           icon: getNotifIcon(a.type),
         }));
-        setNotifications(alerts.slice(0, 15));
+        allNotifications = [...allNotifications, ...alerts];
+
+        // Also fetch database notifications if they exist
+        try {
+          const { fetchUserNotifications } = await import('../../api/reports');
+          const notifRes = await fetchUserNotifications();
+          const dbNotifs = (notifRes?.data || []).map(n => ({
+            id: `notification-${n.id}`,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            time: new Date(n.created_at),
+            color: n.color || 'info',
+            icon: getNotifIcon(n.type),
+            link: n.action_link || '/memorandum-receipts',
+          }));
+          allNotifications = [...dbNotifs, ...allNotifications];
+        } catch (err) {
+          console.error('Failed to fetch database notifications:', err);
+        }
       } else if (user?.role === 'staff') {
-        // For staff: load only their own borrow records from the reports/borrows endpoint
+        // For staff: load their own borrow and MR notifications
+        try {
+          const { fetchUserNotifications } = await import('../../api/reports');
+          const notifRes = await fetchUserNotifications();
+          const dbNotifs = (notifRes?.data || []).map(n => ({
+            id: `notification-${n.id}`,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            time: new Date(n.created_at),
+            color: n.color || 'info',
+            icon: getNotifIcon(n.type),
+            link: n.action_link || '/memorandum-receipts',
+          }));
+          allNotifications = [...dbNotifs];
+        } catch (err) {
+          console.error('Failed to fetch notifications:', err);
+        }
+
+        // Also get borrow notifications
         const { fetchBorrowsReport } = await import('../../api/reports');
         const res = await fetchBorrowsReport({});
         const borrows = res?.data || [];
@@ -122,9 +166,16 @@ const Navbar = ({ onMenuToggle }) => {
             }
           });
 
-        notifs.sort((a, b) => b.time - a.time);
-        setNotifications(notifs.slice(0, 10));
+        allNotifications = [...allNotifications, ...notifs];
       }
+
+      // Sort by most recent and limit to 15
+      allNotifications.sort((a, b) => {
+        const timeA = a.time instanceof Date ? a.time : new Date(a.time);
+        const timeB = b.time instanceof Date ? b.time : new Date(b.time);
+        return timeB - timeA;
+      });
+      setNotifications(allNotifications.slice(0, 15));
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
@@ -376,9 +427,15 @@ const Navbar = ({ onMenuToggle }) => {
             <Divider key="divider-1" />,
             <Box key="mark-all" sx={{ p: 1, textAlign: 'center' }}>
               <MenuItem
-                onClick={() => {
-                  setNotifications([]);
-                  handleNotificationClose();
+                onClick={async () => {
+                  try {
+                    const { markAllNotificationsRead } = await import('../../api/reports');
+                    await markAllNotificationsRead();
+                    setNotifications([]);
+                    handleNotificationClose();
+                  } catch (error) {
+                    console.error('Failed to mark all as read:', error);
+                  }
                 }}
                 sx={{ justifyContent: 'center', color: 'primary.main' }}
               >

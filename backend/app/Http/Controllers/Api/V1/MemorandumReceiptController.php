@@ -7,6 +7,8 @@ use App\Models\MemorandumReceipt;
 use App\Models\MRItem;
 use App\Models\MRSignature;
 use App\Models\MRAuditLog;
+use App\Models\Notification;
+use App\Models\Item;
 use App\Traits\ApiResponses;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -189,6 +191,8 @@ class MemorandumReceiptController extends Controller
                 'notes' => $validated['notes'] ?? null,
                 'form_type' => $formType,
                 'status' => MemorandumReceipt::STATUS_PENDING_REVIEW,
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
             ]);
 
             // Create items with tracking
@@ -216,6 +220,9 @@ class MemorandumReceiptController extends Controller
                 MRAuditLog::ACTION_CREATED,
                 "Memorandum Receipt {$mr->mr_number} created with " . count($validated['items']) . ' items'
             );
+
+            // Notify supply officers and admins of new MR
+            Notification::notifyMRCreated($mr, $request->user());
 
             DB::commit();
 
@@ -386,6 +393,56 @@ class MemorandumReceiptController extends Controller
             return $this->error('Failed to update progress: ' . $e->getMessage(), 500);
         }
     }
+    /**
+     * Reject a Memorandum Receipt
+     */
+    public function reject(Request $request, int $id): JsonResponse
+    {
+        $mr = MemorandumReceipt::with('items')->find($id);
+
+        if (!$mr) {
+            return $this->notFound('Memorandum Receipt not found');
+        }
+
+        // Check authorization - only admins and supply officers can reject
+        $userRole = strtolower($request->user()->role ?? '');
+        if (!in_array($userRole, ['admin', 'supply_officer', 'supply officer'])) {
+            return $this->unauthorized('Only Supply Officers and Admins can reject MRs');
+        }
+
+        // Validate input
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Transition to Rejected status
+            $mr->transitionStatus(MemorandumReceipt::STATUS_REJECTED, user: $request->user());
+
+            // Log the rejection
+            $reason = $validated['reason'] ?? 'No reason provided';
+            MRAuditLog::logAction(
+                $mr->id,
+                'rejected',
+                "Memorandum Receipt {$mr->mr_number} rejected by {$request->user()->name}. Reason: {$reason}"
+            );
+
+            // Notify creator and other admins
+            Notification::notifyMRRejected($mr, $request->user(), $reason);
+
+            DB::commit();
+
+            return $this->ok('Memorandum Receipt rejected successfully', [
+                'mr_number' => $mr->mr_number,
+                'status' => $mr->status,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('Failed to reject Memorandum Receipt: ' . $e->getMessage(), 500);
+        }
+    }
 
     /**
      * Return equipment (create return record)
@@ -522,11 +579,52 @@ class MemorandumReceiptController extends Controller
     }
 
     /**
-     * Sign a Memorandum Receipt (alias for acknowledge)
+     * Sign a Memorandum Receipt (mark receipt as signed)
      */
     public function sign(Request $request, int $id): JsonResponse
     {
-        return $this->acknowledge($request, $id);
+        $mr = MemorandumReceipt::with('items')->find($id);
+
+        if (!$mr) {
+            return $this->notFound('Memorandum Receipt not found');
+        }
+
+        // Validate input
+        $validated = $request->validate([
+            'signature_data' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Find or create signature for the user
+            $signature = $mr->signatures()->firstOrCreate(
+                ['user_id' => $request->user()->id],
+                ['status' => MRSignature::STATUS_PENDING]
+            );
+
+            // Mark as signed
+            if ($validated['signature_data'] ?? false) {
+                $signature->markAsSigned($validated['signature_data']);
+            }
+
+            // Log the action
+            MRAuditLog::logAction(
+                $mr->id,
+                'signed',
+                "Memorandum Receipt {$mr->mr_number} signed by {$request->user()->name}"
+            );
+
+            DB::commit();
+
+            return $this->ok('Memorandum Receipt signed successfully', [
+                'mr_number' => $mr->mr_number,
+                'status' => $mr->status,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('Failed to sign Memorandum Receipt: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -559,8 +657,8 @@ class MemorandumReceiptController extends Controller
                 "Memorandum Receipt {$mr->mr_number} approved by {$request->user()->name}"
             );
 
-            // Notify all staff who requested items (send to all users)
-            $this->notifyAllStaffOfApproval($mr, $request->user());
+            // Notify creator and other admins
+            Notification::notifyMRApproved($mr, $request->user());
 
             DB::commit();
 
@@ -754,4 +852,3 @@ class MemorandumReceiptController extends Controller
         }
     }
 }
-
