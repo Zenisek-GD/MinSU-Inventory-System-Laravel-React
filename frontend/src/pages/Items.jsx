@@ -100,6 +100,8 @@ const ItemsPage = () => {
     fund_cluster: "General Trust Fund",
     office_id: "",
     status: "Available",
+    item_type: "equipment",
+    stock: "",
     serial_number: "",
     condition: "Good",
     purchase_date: "",
@@ -158,7 +160,7 @@ const ItemsPage = () => {
       setItems(prev => [result.item, ...prev]);
       setNewItem({
         name: "", description: "", category_id: "", fund_cluster: "General Trust Fund", office_id: "", status: "Available",
-        serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "",
+        item_type: "equipment", stock: "", serial_number: "", condition: "Good", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "",
         last_condition_check: ""
       });
       setDialogOpen(false);
@@ -179,6 +181,8 @@ const ItemsPage = () => {
       fund_cluster: item.fund_cluster || "General Trust Fund",
       office_id: item.office_id,
       status: item.status,
+      item_type: item.item_type || "equipment",
+      stock: item.stock || "",
       serial_number: item.serial_number,
       condition: item.condition,
       purchase_date: item.purchase_date,
@@ -1424,6 +1428,35 @@ const ItemsPage = () => {
                     </MenuItem>
                   ))}
                 </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Item Type"
+                  value={newItem.item_type}
+                  onChange={e => setNewItem({ ...newItem, item_type: e.target.value })}
+                  required
+                  variant="outlined"
+                  size="small"
+                >
+                  <MenuItem value="equipment">Equipment</MenuItem>
+                  <MenuItem value="consumable">Consumable</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Stock Quantity"
+                  type="number"
+                  value={newItem.stock}
+                  onChange={e => setNewItem({ ...newItem, stock: e.target.value })}
+                  required={newItem.item_type === 'consumable'}
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText={newItem.item_type === 'consumable' ? "Required for consumable items" : "Optional stock tracking"}
+                  variant="outlined"
+                  size="small"
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField

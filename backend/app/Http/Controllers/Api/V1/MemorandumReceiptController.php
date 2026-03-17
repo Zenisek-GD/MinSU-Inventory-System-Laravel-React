@@ -9,6 +9,7 @@ use App\Models\MRSignature;
 use App\Models\MRAuditLog;
 use App\Models\Notification;
 use App\Models\Item;
+use App\Models\StockMovement;
 use App\Traits\ApiResponses;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -449,29 +450,105 @@ class MemorandumReceiptController extends Controller
      */
     public function returnEquipment(Request $request, int $id): JsonResponse
     {
-        $mr = MemorandumReceipt::find($id);
+        $mr = MemorandumReceipt::with('items')->find($id);
 
         if (!$mr) {
             return $this->notFound('Memorandum Receipt not found');
         }
 
+        // Check authorization - must be the accountable officer or admin
+        $userRole = strtolower($request->user()->role ?? '');
+        $isAccountableOfficer = strcasecmp($mr->accountable_officer, $request->user()->name) === 0;
+        $isAdmin = in_array($userRole, ['admin', 'supply_officer', 'supply officer']);
+
+        if (!$isAccountableOfficer && !$isAdmin) {
+            return $this->unauthorized('Only the accountable officer can return this MR');
+        }
+
         // Validate input
         $validated = $request->validate([
             'return_date' => 'required|date',
-            'return_condition' => 'nullable|in:Good,Fair,Poor,Damaged,Non-functional',
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|integer|exists:mr_items,id',
+            'items.*.return_condition' => 'required|in:Excellent,Good,Fair,Needs Repair,Damaged,Disposed',
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        // Log the return
-        MRAuditLog::logAction(
-            $mr->id,
-            'equipment_returned',
-            "Equipment returned on {$validated['return_date']}. Condition: {$validated['return_condition']}. Notes: {$validated['notes']}"
-        );
+        DB::beginTransaction();
 
-        return $this->ok('Equipment return recorded successfully', [
-            'mr_number' => $mr->mr_number,
-        ]);
+        try {
+            $returnedCount = 0;
+            $returnedItemsInfo = '';
+
+            // Process each returned item
+            foreach ($validated['items'] as $itemData) {
+                $mrItem = MRItem::find($itemData['id']);
+                if (!$mrItem)
+                    continue;
+
+                // Update the MR Item condition
+                $mrItem->update([
+                    'condition' => $itemData['return_condition'],
+                    'return_date' => $validated['return_date'],
+                ]);
+
+                // Update inventory item if it exists
+                if ($mrItem->item_id) {
+                    $inventoryItem = Item::find($mrItem->item_id);
+                    if ($inventoryItem) {
+                        // Update item condition
+                        $inventoryItem->condition = $itemData['return_condition'];
+                        $inventoryItem->status = 'In Stock';
+                        $inventoryItem->assigned_to = null; // Clear assignment
+
+                        // If item is consumable and has stock tracking, add quantity back
+                        if ($inventoryItem->item_type === 'consumable' && $mrItem->qty) {
+                            $inventoryItem->stock = ($inventoryItem->stock ?? 0) + ($mrItem->qty ?? 0);
+                        }
+
+                        $inventoryItem->save();
+
+                        // Create stock movement record for the return
+                        StockMovement::create([
+                            'item_id' => $inventoryItem->id,
+                            'type' => 'transfer',
+                            'quantity' => $mrItem->qty,
+                            'reference_number' => "MR-{$mr->mr_number}",
+                            'performed_by' => $request->user()->id,
+                            'notes' => "Item returned from MR {$mr->mr_number}. Condition: {$itemData['return_condition']}",
+                        ]);
+
+                        $returnedCount++;
+                        $returnedItemsInfo .= ($returnedItemsInfo ? ', ' : '') . "{$mrItem->item_name} ({$itemData['return_condition']})";
+                    }
+                }
+            }
+
+            // Update MR status to Returned
+            $mr->transitionStatus(MemorandumReceipt::STATUS_RETURNED, user: $request->user());
+
+            // Notify supply officers about the return
+            Notification::notifyMRReturned($mr, $request->user(), "Returned {$returnedCount} item(s): {$returnedItemsInfo}");
+
+            // Log the return
+            MRAuditLog::logAction(
+                $mr->id,
+                'equipment_returned',
+                "Equipment returned on {$validated['return_date']}. {$returnedCount} item(s) returned with conditions checked. Details: {$returnedItemsInfo}. Notes: {$validated['notes']}"
+            );
+
+            DB::commit();
+
+            return $this->ok('Equipment returned successfully and stock updated', [
+                'mr_number' => $mr->mr_number,
+                'status' => $mr->status,
+                'items_returned' => $returnedCount,
+                'return_date' => $validated['return_date'],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('Failed to return equipment: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -761,6 +838,9 @@ class MemorandumReceiptController extends Controller
 
             // Update MR to reflect acceptance
             $mr->transitionStatus(MemorandumReceipt::STATUS_COMPLETED, user: $request->user());
+
+            // Notify supply officers that items were received
+            Notification::notifyMRReceived($mr, $request->user());
 
             // Log the acceptance
             MRAuditLog::logAction(

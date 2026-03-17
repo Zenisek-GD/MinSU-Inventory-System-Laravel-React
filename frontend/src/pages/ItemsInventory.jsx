@@ -86,6 +86,8 @@ export default function ItemsInventoryPage() {
     condition: "Good",
     serial_number: "",
     office_id: "",
+    item_type: "equipment",
+    stock: "",
     purchase_date: "",
     purchase_price: "",
     warranty_expiry: "",
@@ -229,7 +231,7 @@ export default function ItemsInventoryPage() {
 
   // Open dialogs
   const openAdd = () => {
-    setForm({ name: "", description: "", category_id: "", condition: "Good", serial_number: "", office_id: "", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "" });
+    setForm({ name: "", description: "", category_id: "", condition: "Good", serial_number: "", office_id: "", item_type: "equipment", stock: "", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "" });
     setAddOpen(true);
   };
   const openEdit = (item) => {
@@ -241,6 +243,8 @@ export default function ItemsInventoryPage() {
       condition: item.condition || "Good",
       serial_number: item.serial_number || "",
       office_id: item.office_id || item.office?.id || "",
+      item_type: item.item_type || "equipment",
+      stock: item.stock || "",
       purchase_date: item.purchase_date || "",
       purchase_price: item.purchase_price || "",
       warranty_expiry: item.warranty_expiry || "",
@@ -1291,6 +1295,11 @@ export default function ItemsInventoryPage() {
             <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
+            <TextField select label="Item Type" value={form.item_type} onChange={e => setForm(f => ({ ...f, item_type: e.target.value }))} fullWidth required>
+              <MenuItem value="equipment">Equipment</MenuItem>
+              <MenuItem value="consumable">Consumable</MenuItem>
+            </TextField>
+            <TextField label="Stock Quantity" type="number" inputProps={{ min: 0, step: 1 }} value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} fullWidth required={form.item_type === 'consumable'} helperText={form.item_type === 'consumable' ? "Required for consumable items" : "Optional stock tracking"} />
             <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
             <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
             <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
@@ -1326,6 +1335,11 @@ export default function ItemsInventoryPage() {
             <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
+            <TextField select label="Item Type" value={form.item_type} onChange={e => setForm(f => ({ ...f, item_type: e.target.value }))} fullWidth required>
+              <MenuItem value="equipment">Equipment</MenuItem>
+              <MenuItem value="consumable">Consumable</MenuItem>
+            </TextField>
+            <TextField label="Stock Quantity" type="number" inputProps={{ min: 0, step: 1 }} value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} fullWidth required={form.item_type === 'consumable'} helperText={form.item_type === 'consumable' ? "Required for consumable items" : "Optional stock tracking"} />
             <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
             <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
             <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
@@ -1333,7 +1347,7 @@ export default function ItemsInventoryPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setEditOpen(false); setEditingItem(null); }}>Cancel</Button>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
           <Button onClick={submitEdit} disabled={mutating} variant="contained">Update</Button>
         </DialogActions>
       </Dialog>

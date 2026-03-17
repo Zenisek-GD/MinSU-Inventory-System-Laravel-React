@@ -34,6 +34,8 @@ import {
   Close as CloseIcon,
   Inventory as InventoryIcon,
   Build as BuildIcon,
+  Checklist as ChecklistIcon,
+  PublishedWithChanges as PublishedWithChangesIcon,
 } from '@mui/icons-material';
 import { logout as logoutApi } from '../../api/Auth';
 import { useUser } from '../../context/UserContext';
@@ -67,6 +69,8 @@ const Navbar = ({ onMenuToggle }) => {
       case 'mr_created': return <AssignmentIcon />;
       case 'mr_approved': return <CheckCircleIcon />;
       case 'mr_rejected': return <CloseIcon />;
+      case 'mr_received': return <ChecklistIcon />;
+      case 'mr_returned': return <PublishedWithChangesIcon />;
       case 'mr_pending_approval': return <WarningIcon />;
       default: return <InfoIcon />;
     }

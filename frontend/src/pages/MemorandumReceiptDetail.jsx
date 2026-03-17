@@ -41,6 +41,8 @@ import {
   approveMemorandumReceipt,
   rejectMemorandumReceipt,
   updateProgressMR,
+  acceptMemorandumReceipt,
+  returnMemorandumReceipt,
 } from "../api/memorandumReceipt";
 import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -61,6 +63,8 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PendingIcon from "@mui/icons-material/Pending";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import ChecklistIcon from "@mui/icons-material/Checklist";
+import PublishedWithChangesIcon from "@mui/icons-material/PublishedWithChanges";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ICSForm from "../components/ICSForm";
 import PARForm from "../components/PARForm";
@@ -144,6 +148,15 @@ const MemorandumReceiptDetailPage = () => {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printFormType, setPrintFormType] = useState("ics");
   const printRef = useRef(null);
+
+  // Receive Items State
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+
+  // Return Items State
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnDate, setReturnDate] = useState(new Date().toISOString().split("T")[0]);
+  const [returnItems, setReturnItems] = useState([]);
+  const [returnNotes, setReturnNotes] = useState("");
 
   // Fetch MR details
   useEffect(() => {
@@ -263,6 +276,65 @@ const MemorandumReceiptDetailPage = () => {
       </html>
     `);
     printWindow.document.close();
+  };
+
+  // Handle receive items
+  const handleReceive = async () => {
+    try {
+      setUpdating(true);
+      await acceptMemorandumReceipt(id);
+      const response = await fetchMemorandumReceipt(id);
+      setMr(response.data.mr);
+      setReceiveDialogOpen(false);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to receive items");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Handle return items
+  const handleReturn = async () => {
+    if (!returnDate) {
+      setError("Please select a return date");
+      return;
+    }
+
+    if (returnItems.length === 0) {
+      setError("Please select at least one item to return");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await returnMemorandumReceipt(id, {
+        return_date: returnDate,
+        items: returnItems,
+        notes: returnNotes,
+      });
+      const response = await fetchMemorandumReceipt(id);
+      setMr(response.data.mr);
+      setReturnDialogOpen(false);
+      setReturnDate(new Date().toISOString().split("T")[0]);
+      setReturnItems([]);
+      setReturnNotes("");
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to return items");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Initialize return items when dialog opens
+  const handleOpenReturnDialog = () => {
+    const itemsForReturn = (items || []).map(item => ({
+      id: item.id,
+      return_condition: item.condition || "Good",
+    }));
+    setReturnItems(itemsForReturn);
+    setReturnDialogOpen(true);
   };
 
   if (loading) {
@@ -800,6 +872,44 @@ const MemorandumReceiptDetailPage = () => {
               Update Progress
             </Button>
           )}
+
+          {mr.status === "For Receiving" && (
+            <Button
+              variant="contained"
+              startIcon={<ChecklistIcon />}
+              onClick={() => setReceiveDialogOpen(true)}
+              disabled={updating}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1,
+                textTransform: 'none',
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #2e7d32 0%, #1b5a20 100%)'
+              }}
+            >
+              Receive & Sign
+            </Button>
+          )}
+
+          {mr.status === "Completed" && (
+            <Button
+              variant="contained"
+              startIcon={<PublishedWithChangesIcon />}
+              onClick={handleOpenReturnDialog}
+              disabled={updating}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1,
+                textTransform: 'none',
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)'
+              }}
+            >
+              Return Items
+            </Button>
+          )}
         </Paper>
 
         {/* Print Preview Dialog */}
@@ -1024,6 +1134,199 @@ const MemorandumReceiptDetailPage = () => {
               sx={{ borderRadius: 2 }}
             >
               {updating ? <CircularProgress size={24} /> : 'Confirm Rejection'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Receive Items Dialog */}
+        <Dialog 
+          open={receiveDialogOpen} 
+          onClose={() => setReceiveDialogOpen(false)} 
+          maxWidth="sm" 
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ 
+            fontWeight: 700,
+            bgcolor: alpha('#2e7d32', 0.04),
+            color: '#2e7d32',
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}>
+            Receive Memorandum Receipt Items
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+              By signing below, you confirm receipt of all items listed in this Memorandum Receipt and accept responsibility for their custody and safekeeping.
+            </Alert>
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: alpha('#2e7d32', 0.05), 
+              borderRadius: 2, 
+              border: '1px solid',
+              borderColor: alpha('#2e7d32', 0.2)
+            }}>
+              <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                Items to Receive:
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                {items?.map((item, idx) => (
+                  <Box 
+                    key={idx}
+                    sx={{ 
+                      py: 1, 
+                      px: 1.5, 
+                      borderBottom: '1px solid',
+                      borderColor: alpha('#000', 0.1),
+                      '&:last-child': { borderBottom: 'none' }
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2">
+                        {item.item_name} ({item.qty} {item.unit})
+                      </Typography>
+                      <Chip 
+                        label={item.condition} 
+                        size="small" 
+                        variant="outlined"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button 
+              onClick={() => setReceiveDialogOpen(false)}
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleReceive} 
+              variant="contained" 
+              color="success"
+              startIcon={<CheckCircleIcon />}
+              disabled={updating}
+              sx={{ borderRadius: 2 }}
+            >
+              {updating ? <CircularProgress size={24} /> : 'Confirm Receipt & Sign'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Return Items Dialog */}
+        <Dialog 
+          open={returnDialogOpen} 
+          onClose={() => setReturnDialogOpen(false)} 
+          maxWidth="md" 
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ 
+            fontWeight: 700,
+            bgcolor: alpha('#ed6c02', 0.04),
+            color: '#ed6c02',
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}>
+            Return Memorandum Receipt Items
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+              Please review the condition of each item before returning. Your assessment will be recorded.
+            </Alert>
+            
+            <TextField
+              type="date"
+              label="Return Date"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 3 }}
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
+              Item Conditions:
+            </Typography>
+
+            <Box sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
+              {items?.map((item, idx) => (
+                <Paper 
+                  key={idx}
+                  variant="outlined"
+                  sx={{ 
+                    p: 2, 
+                    mb: 2, 
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: 'divider'
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {item.item_name}
+                    </Typography>
+                    <Chip label={`Qty: ${item.qty}`} size="small" variant="outlined" />
+                  </Stack>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Return Condition"
+                    value={returnItems[idx]?.return_condition || item.condition || "Good"}
+                    onChange={(e) => {
+                      const newItems = [...returnItems];
+                      newItems[idx] = { ...newItems[idx], return_condition: e.target.value };
+                      setReturnItems(newItems);
+                    }}
+                    sx={{ mt: 1 }}
+                  >
+                    <MenuItem value="Excellent">Excellent</MenuItem>
+                    <MenuItem value="Good">Good</MenuItem>
+                    <MenuItem value="Fair">Fair</MenuItem>
+                    <MenuItem value="Needs Repair">Needs Repair</MenuItem>
+                    <MenuItem value="Damaged">Damaged</MenuItem>
+                    <MenuItem value="Disposed">Disposed</MenuItem>
+                  </TextField>
+                </Paper>
+              ))}
+            </Box>
+
+            <TextField
+              fullWidth
+              label="Return Notes (Optional)"
+              value={returnNotes}
+              onChange={(e) => setReturnNotes(e.target.value)}
+              multiline
+              rows={3}
+              placeholder="Add any additional notes about the returned items..."
+              sx={{ mb: 2 }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button 
+              onClick={() => setReturnDialogOpen(false)}
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleReturn} 
+              variant="contained" 
+              startIcon={<PublishedWithChangesIcon />}
+              disabled={updating}
+              sx={{ 
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)',
+                color: 'white'
+              }}
+            >
+              {updating ? <CircularProgress size={24} /> : 'Confirm Return'}
             </Button>
           </DialogActions>
         </Dialog>
