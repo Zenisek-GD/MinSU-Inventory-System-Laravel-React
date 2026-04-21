@@ -96,7 +96,7 @@ class ItemController extends Controller
             'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'fund_cluster' => 'required|in:General Trust Fund,Special Trust Fund,TEF Trust Fund,MDS/RAF',
-            'office_id' => 'required|exists:offices,id',
+            'office_id' => 'nullable|exists:offices,id',
             'item_type' => 'required|in:equipment,consumable',
             'stock' => 'required_if:item_type,consumable|nullable|numeric|min:0',
             'serial_number' => 'nullable|string|max:255|unique:items,serial_number',
@@ -117,6 +117,11 @@ class ItemController extends Controller
         // Generate unique QR code
         $qrCode = 'ITEM-' . strtoupper(uniqid());
 
+        // DB column `items.stock` is NOT NULL (defaults to 1). For equipment, treat blank stock as 1.
+        $stockValue = $request->item_type === 'consumable'
+            ? $request->stock
+            : ($request->stock ?? 1);
+
         $item = Item::create([
             'name' => $request->name,
             'description' => $request->description,
@@ -128,7 +133,7 @@ class ItemController extends Controller
             'status' => $request->status ?? 'Available',
             'office_id' => $request->office_id,
             'item_type' => $request->item_type,
-            'stock' => $request->item_type === 'consumable' ? $request->stock : null,
+            'stock' => $stockValue,
             'purchase_date' => $request->purchase_date,
             'purchase_price' => $request->purchase_price,
             'warranty_expiry' => $request->warranty_expiry,
@@ -221,7 +226,7 @@ class ItemController extends Controller
             'description' => 'nullable|string',
             'category_id' => 'sometimes|required|exists:categories,id',
             'fund_cluster' => 'sometimes|required|in:General Trust Fund,Special Trust Fund,TEF Trust Fund,MDS/RAF',
-            'office_id' => 'sometimes|required|exists:offices,id',
+            'office_id' => 'sometimes|nullable|exists:offices,id',
             'item_type' => 'sometimes|required|in:equipment,consumable',
             'stock' => 'required_if:item_type,consumable|nullable|numeric|min:0',
             'serial_number' => 'nullable|string|max:255|unique:items,serial_number,' . $item->id,
@@ -242,22 +247,35 @@ class ItemController extends Controller
 
         DB::beginTransaction();
         try {
+            $payload = $request->all();
+
+            // Prevent NULL stock writes for equipment (DB is NOT NULL). If blank, keep existing.
+            $nextItemType = $payload['item_type'] ?? $item->item_type;
+            if ($nextItemType !== 'consumable' && array_key_exists('stock', $payload) && $payload['stock'] === null) {
+                unset($payload['stock']);
+            }
+
             // Check if office is changing (automatic transfer)
             if ($request->has('office_id') && $item->office_id != $request->office_id) {
                 $oldOfficeId = $item->office_id;
                 $newOfficeId = $request->office_id;
 
-                // Auto-create transfer stock movement
-                $this->stockService->recordMovement([
-                    'item_id' => $item->id,
-                    'type' => 'transfer',
-                    'quantity' => 1, // Assuming single item transfer
-                    'from_office_id' => $oldOfficeId,
-                    'to_office_id' => $newOfficeId,
-                    'reference_number' => 'AUTO-TRANSFER-' . time(),
-                    'notes' => 'Automatic transfer: Office changed from ' . $item->office->name . ' to office #' . $newOfficeId,
-                    'performed_by' => $request->user()->id,
-                ]);
+                // Only treat as a transfer when both old and new locations are set.
+                if (!empty($oldOfficeId) && !empty($newOfficeId)) {
+                    $oldOfficeName = optional($item->office)->name ?? 'Unassigned';
+
+                    // Auto-create transfer stock movement
+                    $this->stockService->recordMovement([
+                        'item_id' => $item->id,
+                        'type' => 'transfer',
+                        'quantity' => 1, // Assuming single item transfer
+                        'from_office_id' => $oldOfficeId,
+                        'to_office_id' => $newOfficeId,
+                        'reference_number' => 'AUTO-TRANSFER-' . time(),
+                        'notes' => 'Automatic transfer: Office changed from ' . $oldOfficeName . ' to office #' . $newOfficeId,
+                        'performed_by' => $request->user()->id,
+                    ]);
+                }
             }
 
             // Check if status is changing to Disposed (automatic disposal)
@@ -284,7 +302,7 @@ class ItemController extends Controller
                 ]);
             }
 
-            $item->update($request->all());
+            $item->update($payload);
             $item->load(['office', 'category']);
 
             DB::commit();

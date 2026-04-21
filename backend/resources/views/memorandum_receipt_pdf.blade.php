@@ -197,10 +197,16 @@
 </head>
 
 <body>
+    @php
+        $formType = $mr->form_type ?? 'ics';
+        $formTitle = $formType === 'par'
+            ? 'Property Acknowledgment Receipt (PAR)'
+            : 'Inventory Custodian Slip (ICS)';
+    @endphp
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📋 Memorandum Receipt</h1>
+            <h1>📋 {{ $formTitle }}</h1>
             <p>MinSU Real-Time Supply Operations Management System</p>
             <p style="margin-top: 5px; font-size: 12px;">Receipt No. #{{ str_pad($mr->id, 6, '0', STR_PAD_LEFT) }} |
                 Generated: {{ now()->format('M d, Y H:i') }}</p>
@@ -215,7 +221,15 @@
                 <div class="section-content">
                     <div class="info-row">
                         <span class="info-label">Receipt Number:</span>
-                        <span class="info-value">#{{ str_pad($mr->id, 6, '0', STR_PAD_LEFT) }}</span>
+                        <span class="info-value">{{ $mr->mr_number ?? ('MR-' . str_pad($mr->id, 6, '0', STR_PAD_LEFT)) }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Form Type:</span>
+                        <span class="info-value">
+                            <span class="badge" style="background-color: {{ $formType === 'par' ? '#fff3e0' : '#e8f5e9' }}; color: {{ $formType === 'par' ? '#b45309' : '#2e7d32' }}; border: 1px solid {{ $formType === 'par' ? '#b45309' : '#2e7d32' }};">
+                                {{ strtoupper($formType) }}
+                            </span>
+                        </span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Date Created:</span>
@@ -224,7 +238,9 @@
                     <div class="info-row">
                         <span class="info-label">Status:</span>
                         <span class="info-value">
-                            <span class="badge" style="background-color: #c8e6c9; color: #2e7d32;">COMPLETED</span>
+                            <span class="badge" style="background-color: #e3f2fd; color: #1565c0;">
+                                {{ strtoupper($mr->status ?? 'N/A') }}
+                            </span>
                         </span>
                     </div>
                 </div>
@@ -240,11 +256,11 @@
                     </div>
                     <div class="info-row">
                         <span class="info-label">Office:</span>
-                        <span class="info-value">{{ $mr->office->name ?? 'N/A' }}</span>
+                        <span class="info-value">{{ $mr->office ?? 'N/A' }}</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Receiving Officer:</span>
-                        <span class="info-value">{{ $mr->officer->name ?? 'N/A' }}</span>
+                        <span class="info-label">Accountable Officer:</span>
+                        <span class="info-value">{{ $mr->accountable_officer ?? 'N/A' }}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Position:</span>
@@ -254,6 +270,12 @@
                         <span class="info-label">Received From:</span>
                         <span class="info-value">{{ $mr->received_from ?? 'N/A' }}</span>
                     </div>
+                    @if(!empty($mr->purpose))
+                        <div class="info-row">
+                            <span class="info-label">Purpose:</span>
+                            <span class="info-value">{{ $mr->purpose }}</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -264,39 +286,39 @@
                     <thead>
                         <tr>
                             <th style="width: 5%;">#</th>
-                            <th style="width: 35%;">Item Description</th>
-                            <th style="width: 15%;">Category</th>
-                            <th style="width: 15%;">Type</th>
-                            <th style="width: 12%;">Quantity</th>
-                            <th style="width: 18%;">Unit</th>
+                            <th style="width: 28%;">Item Description</th>
+                            <th style="width: 15%;">Property No.</th>
+                            <th style="width: 10%;">Qty</th>
+                            <th style="width: 10%;">Unit</th>
+                            <th style="width: 12%;">Unit Cost</th>
+                            <th style="width: 12%;">Total Cost</th>
+                            @if($formType === 'ics')
+                                <th style="width: 8%;">Useful Life</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($mr->items as $index => $item)
+                        @forelse ($mr->items as $index => $item)
                             <tr>
                                 <td>{{ $index + 1 }}</td>
                                 <td>
-                                    <strong>{{ $item->name }}</strong>
-                                    @if($item->description)
-                                        <br><small style="color: #666;">{{ $item->description }}</small>
+                                    <strong>{{ $item->item_name }}</strong>
+                                    @if(!empty($item->remarks))
+                                        <br><small style="color: #666;">{{ $item->remarks }}</small>
                                     @endif
                                 </td>
-                                <td>{{ $item->category->name ?? 'Uncategorized' }}</td>
-                                <td>
-                                    @if($item->item_type === 'equipment')
-                                        <span class="badge badge-equipment">Equipment</span>
-                                    @else
-                                        <span class="badge badge-consumable">Consumable</span>
-                                    @endif
-                                </td>
-                                <td style="text-align: center;">
-                                    {{ $item->pivot->quantity ?? 1 }}
-                                </td>
-                                <td>{{ $item->unit ?? $item->pivot->unit ?? 'pcs' }}</td>
+                                <td>{{ $item->property_number ?? '—' }}</td>
+                                <td style="text-align: center;">{{ $item->qty }}</td>
+                                <td>{{ $item->unit ?? 'pcs' }}</td>
+                                <td>₱{{ number_format((float) $item->unit_cost, 2) }}</td>
+                                <td>₱{{ number_format((float) $item->total_cost, 2) }}</td>
+                                @if($formType === 'ics')
+                                    <td>{{ $item->estimated_useful_life ?? '—' }}</td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" style="text-align: center; color: #999; padding: 20px;">
+                                <td colspan="{{ $formType === 'ics' ? 8 : 7 }}" style="text-align: center; color: #999; padding: 20px;">
                                     No items recorded in this receipt
                                 </td>
                             </tr>
@@ -314,9 +336,13 @@
                         <span class="info-value"><strong>{{ count($mr->items) }}</strong></span>
                     </div>
                     <div class="info-row">
+                        <span class="info-label">Total Cost:</span>
+                        <span class="info-value"><strong>₱{{ number_format((float) $mr->items->sum('total_cost'), 2) }}</strong></span>
+                    </div>
+                    <div class="info-row">
                         <span class="info-label">Receipt Status:</span>
                         <span class="info-value">
-                            <strong style="color: #2e7d32;">✓ Completed</strong>
+                            <strong style="color: #1565c0;">{{ $mr->status ?? 'N/A' }}</strong>
                         </span>
                     </div>
                 </div>
@@ -330,7 +356,7 @@
                         (Receiving Officer)
                     </p>
                     <div class="signature-line"></div>
-                    <div class="signature-label">{{ $mr->officer->name ?? 'Name' }}</div>
+                    <div class="signature-label">{{ $mr->accountable_officer ?? 'Name' }}</div>
                     <div style="font-size: 11px; color: #666;">{{ $mr->created_at->format('F d, Y') }}</div>
                 </div>
 

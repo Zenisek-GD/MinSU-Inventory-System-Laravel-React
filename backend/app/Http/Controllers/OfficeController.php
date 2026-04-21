@@ -3,10 +3,37 @@
 namespace App\Http\Controllers;
 
 use App\Models\Office;
+use App\Services\LocationService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OfficeController extends Controller
 {
+    private const OFFICE_TYPES = [
+        'office',
+        'classroom',
+        'laboratory',
+        'studio',
+        'lecture_hall',
+        'registrar',
+        'business_center',
+        'admin',
+        'dean',
+        'faculty',
+        'department',
+        'student_center',
+        'counseling',
+        'clinic',
+        'library',
+        'lounge',
+        'storage',
+        'conference',
+        'cafeteria',
+        'maintenance',
+        'security',
+        'other',
+    ];
+
     public function index(Request $request)
     {
         $query = Office::query()->with(['department.college'])->orderBy('name');
@@ -20,13 +47,25 @@ class OfficeController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:office,classroom,laboratory',
+            'type' => ['required', Rule::in(self::OFFICE_TYPES)],
             'category' => 'required|in:facility,departmental',
             'department_id' => 'nullable|exists:departments,id',
             'room_number' => 'nullable|string|max:64',
             'building' => 'nullable|string|max:255',
             'floor' => 'nullable|string|max:64',
+            'room_id' => ['nullable', 'string', 'max:64', 'unique:offices,room_id'],
+            'year_level' => 'nullable|integer|min:1|max:4',
+            'assigned_professor' => 'nullable|string|max:255',
         ]);
+
+        $validated['room_id'] = LocationService::inferRoomId($validated);
+        if (!LocationService::isValidRoomId($validated['room_id'] ?? null)) {
+            return response()->json(['error' => 'Invalid room_id format'], 422);
+        }
+
+        if (!empty($validated['room_id']) && Office::where('room_id', $validated['room_id'])->exists()) {
+            return response()->json(['error' => 'room_id already exists'], 422);
+        }
 
         // Validate: departmental offices must have department_id
         if ($validated['category'] === 'departmental' && !isset($validated['department_id'])) {
@@ -53,13 +92,25 @@ class OfficeController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:office,classroom,laboratory',
+            'type' => ['required', Rule::in(self::OFFICE_TYPES)],
             'category' => 'required|in:facility,departmental',
             'department_id' => 'nullable|exists:departments,id',
             'room_number' => 'nullable|string|max:64',
             'building' => 'nullable|string|max:255',
             'floor' => 'nullable|string|max:64',
+            'room_id' => ['nullable', 'string', 'max:64', Rule::unique('offices', 'room_id')->ignore($office->id)],
+            'year_level' => 'nullable|integer|min:1|max:4',
+            'assigned_professor' => 'nullable|string|max:255',
         ]);
+
+        $validated['room_id'] = LocationService::inferRoomId($validated);
+        if (!LocationService::isValidRoomId($validated['room_id'] ?? null)) {
+            return response()->json(['error' => 'Invalid room_id format'], 422);
+        }
+
+        if (!empty($validated['room_id']) && Office::where('room_id', $validated['room_id'])->where('id', '!=', $office->id)->exists()) {
+            return response()->json(['error' => 'room_id already exists'], 422);
+        }
 
         // Validate: departmental offices must have department_id
         if ($validated['category'] === 'departmental' && !isset($validated['department_id'])) {

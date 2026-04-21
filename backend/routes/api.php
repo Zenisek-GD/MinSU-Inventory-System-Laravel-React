@@ -10,7 +10,9 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\ItemController;
 use App\Http\Controllers\Api\V1\PurchaseRequestController;
 use App\Http\Controllers\Api\V1\MemorandumReceiptController;
+use App\Http\Controllers\Api\V1\ReceivedSuppliesController;
 use App\Http\Controllers\Api\V1\ScannerSessionController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\CollegeController;
 use App\Http\Controllers\DepartmentController;
@@ -38,6 +40,9 @@ Route::prefix('v1')->group(function () {
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+        Route::get('/dashboard/mr-timeline', [DashboardController::class, 'mrTimeline']);
+
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/user', [AuthController::class, 'user']);
         Route::get('/profile', [AuthController::class, 'profile']);
@@ -81,9 +86,13 @@ Route::prefix('v1')->group(function () {
         Route::put('memorandum-receipts/{id}/reject', [MemorandumReceiptController::class, 'reject']);
         Route::post('memorandum-receipts/{id}/accept', [MemorandumReceiptController::class, 'accept']);
         Route::post('memorandum-receipts/{id}/return', [MemorandumReceiptController::class, 'returnEquipment']);
+        Route::post('memorandum-receipts/{id}/transfer', [MemorandumReceiptController::class, 'transfer']);
         Route::get('memorandum-receipts/{id}/audit-log', [MemorandumReceiptController::class, 'auditLog']);
         Route::get('memorandum-receipts/{id}/export-pdf', [MemorandumReceiptController::class, 'exportPDF']);
         Route::post('memorandum-receipts/batch-approve', [MemorandumReceiptController::class, 'batchApprove']);
+
+        // Received supplies logs (MR acceptance)
+        Route::get('received-supplies', [ReceivedSuppliesController::class, 'index']);
 
         // Borrow resource routes
         Route::apiResource('borrows', \App\Http\Controllers\Api\V1\BorrowController::class);

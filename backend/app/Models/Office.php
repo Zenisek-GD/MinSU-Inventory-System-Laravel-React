@@ -25,6 +25,10 @@ class Office extends Model
         'room_number',
         'building',
         'floor',
+        // standardized identifiers + metadata
+        'room_id',
+        'year_level',
+        'assigned_professor',
     ];
 
     public function department(): BelongsTo

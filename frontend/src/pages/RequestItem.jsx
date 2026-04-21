@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/Layout/DashboardLayout';
 import { fetchItems } from '../api/item';
 import { fetchOffices } from '../api/office';
@@ -20,6 +20,7 @@ import MemorandumReceiptForm from '../components/MemorandumReceiptForm';
 
 export default function RequestItemPage() {
   const { user } = useUser();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [offices, setOffices] = useState([]);
   const [users, setUsers] = useState([]);
@@ -27,6 +28,8 @@ export default function RequestItemPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mrInitialValues, setMrInitialValues] = useState(null);
+  const [mrInitialItems, setMrInitialItems] = useState(null);
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [selectedForSignature, setSelectedForSignature] = useState(null);
   const [exporting, setExporting] = useState(false);
@@ -36,16 +39,7 @@ export default function RequestItemPage() {
     role: '',
     signature_data: '',
   });
-  const [form, setForm] = useState({
-    office: '',
-    accountable_officer: '',
-    purpose: '',
-    items: [],
-    fund_cluster: 'General Fund',
-    position: 'Staff',
-    received_from: 'Direct Purchase',
-    notes: ''
-  });
+  // legacy local form state removed in favor of MemorandumReceiptForm
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [itemSearch, setItemSearch] = useState('');
   const [itemPage, setItemPage] = useState(0);
@@ -61,14 +55,6 @@ export default function RequestItemPage() {
   ];
 
   useEffect(() => { loadAll(); }, []);
-
-  useEffect(() => {
-    // If user is staff, default the office to their assigned office
-    if (user?.office) {
-      setForm((f) => ({ ...f, office: user.office.name || user.office.office_name }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
   const location = useLocation();
 
@@ -125,28 +111,35 @@ export default function RequestItemPage() {
 
   const openRequestDialog = (item) => {
     setSelected(item);
-    setForm({
+
+    const today = new Date().toISOString().split('T')[0];
+    setMrInitialValues({
       office: user?.office?.name || user?.office?.office_name || '',
       accountable_officer: user?.name || '',
-      purpose: `Request for ${item.name}`,
-      fund_cluster: 'General Fund',
       position: 'Staff',
+      fund_cluster: 'General Fund',
       received_from: 'Direct Purchase',
+      purpose: `Request for ${item.name}`,
       notes: '',
-      items: [{
+      date_issued: today,
+    });
+
+    setMrInitialItems([
+      {
+        item_id: item.id,
         item_name: item.name,
         item_type: item.item_type || 'equipment',
-        description: item.description || '',
         qty: 1,
-        unit: item.unit || 'piece',
+        unit: item.unit || 'pcs',
         property_number: item.qr_code || '',
-        acquisition_date: new Date().toISOString().split("T")[0],
+        acquisition_date: today,
         unit_cost: item.unit_cost || 0,
-        total_cost: item.unit_cost || 0,
         condition: 'Good',
-        remarks: ''
-      }]
-    });
+        remarks: '',
+        estimated_useful_life: '',
+      },
+    ]);
+
     setDialogOpen(true);
   };
 
@@ -154,32 +147,20 @@ export default function RequestItemPage() {
   const openNewMRDialog = () => {
     setSelected(null);
     const currentDate = new Date().toISOString().split('T')[0];
-    setForm({
+
+    setMrInitialValues({
       office: user?.office?.name || user?.office?.office_name || '',
       accountable_officer: user?.name || '',
-      purpose: '',
-      fund_cluster: 'General Fund',
       position: 'Staff',
+      fund_cluster: 'General Fund',
       received_from: 'Direct Purchase',
+      purpose: '',
       notes: `Prepared by: ${user?.name || 'N/A'} on ${currentDate}`,
-      items: []
+      date_issued: currentDate,
     });
+
+    setMrInitialItems([]);
     setDialogOpen(true);
-  };
-
-  const handleItemChange = (idx, e) => {
-    const itemsArr = [...form.items];
-    const fieldName = e.target.name;
-    itemsArr[idx][fieldName] = e.target.value;
-
-    // Auto-calculate total_cost when qty or unit_cost changes
-    if (fieldName === 'qty' || fieldName === 'unit_cost') {
-      const qty = parseFloat(itemsArr[idx].qty) || 0;
-      const unitCost = parseFloat(itemsArr[idx].unit_cost) || 0;
-      itemsArr[idx].total_cost = (qty * unitCost).toFixed(2);
-    }
-
-    setForm({ ...form, items: itemsArr });
   };
 
   // Use the form component's handler
@@ -487,6 +468,15 @@ export default function RequestItemPage() {
                           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                             <Button
                               size="small"
+                              startIcon={<DescriptionIcon />}
+                              onClick={() => navigate(`/memorandum-receipts/${req.id}`)}
+                              variant="outlined"
+                              sx={{ color: '#006400', borderColor: '#006400' }}
+                            >
+                              Timeline
+                            </Button>
+                            <Button
+                              size="small"
                               startIcon={<DownloadIcon />}
                               onClick={() => handleExportPDF(req.id)}
                               disabled={exporting}
@@ -555,10 +545,14 @@ export default function RequestItemPage() {
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <MemorandumReceiptForm
+              key={dialogOpen ? (selected?.id || 'new') : 'closed'}
               items={items}
               offices={offices}
               users={users}
+              initialValues={mrInitialValues}
+              initialItems={mrInitialItems}
               onSubmit={handleMRSubmit}
+              onCancel={() => setDialogOpen(false)}
               submitButtonText="Create MR"
               isLoading={false}
               variant="compact"

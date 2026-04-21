@@ -75,6 +75,7 @@ class MemorandumReceipt extends Model
     public const STATUS_PENDING_REVIEW = 'Pending Review';
     public const STATUS_APPROVED = 'Approved';
     public const STATUS_RETURNED = 'Returned';
+    public const STATUS_TURNED_IN = 'Turned In';
     public const STATUS_REJECTED = 'Rejected';
     public const STATUS_PROCESSING = 'Processing';
     public const STATUS_READY_FOR_RELEASE = 'Ready for Release';
@@ -191,6 +192,7 @@ class MemorandumReceipt extends Model
     {
         return in_array($this->status, [
             self::STATUS_COMPLETED,
+            self::STATUS_TURNED_IN,
             self::STATUS_REJECTED,
             self::STATUS_CANCELLED,
         ]);
@@ -243,7 +245,8 @@ class MemorandumReceipt extends Model
             self::STATUS_FOR_RECEIVING => [self::STATUS_COMPLETED, self::STATUS_ISSUE_REPORTED],
             self::STATUS_ISSUE_REPORTED => [self::STATUS_COMPLETED, self::STATUS_PROCESSING, self::STATUS_CANCELLED],
             self::STATUS_REJECTED => [self::STATUS_PENDING_REVIEW], // Can return to pending
-            self::STATUS_COMPLETED => [], // Final state
+            self::STATUS_COMPLETED => [self::STATUS_TURNED_IN],
+            self::STATUS_TURNED_IN => [], // Final state
             self::STATUS_CANCELLED => [], // Final state
         ];
 
@@ -338,6 +341,7 @@ class MemorandumReceipt extends Model
     {
         return $query->whereNotIn('status', [
             self::STATUS_COMPLETED,
+            self::STATUS_TURNED_IN,
             self::STATUS_REJECTED,
             self::STATUS_CANCELLED,
         ]);
@@ -357,6 +361,7 @@ class MemorandumReceipt extends Model
             self::STATUS_OUT_FOR_DELIVERY => ['label' => 'Out for Delivery', 'color' => 'primary'],
             self::STATUS_FOR_RECEIVING => ['label' => 'For Receiving', 'color' => 'secondary'],
             self::STATUS_COMPLETED => ['label' => 'Completed', 'color' => 'success'],
+            self::STATUS_TURNED_IN => ['label' => 'Turned In', 'color' => 'success'],
             self::STATUS_ISSUE_REPORTED => ['label' => 'Issue Reported', 'color' => 'error'],
             self::STATUS_REJECTED => ['label' => 'Rejected', 'color' => 'error'],
             self::STATUS_CANCELLED => ['label' => 'Cancelled', 'color' => 'error'],

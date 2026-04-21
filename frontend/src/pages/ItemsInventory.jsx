@@ -93,6 +93,7 @@ export default function ItemsInventoryPage() {
     warranty_expiry: "",
     notes: "",
   });
+  const [warrantyPeriod, setWarrantyPeriod] = useState("");
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("all");
   const [status, setStatus] = useState("all");
@@ -232,6 +233,7 @@ export default function ItemsInventoryPage() {
   // Open dialogs
   const openAdd = () => {
     setForm({ name: "", description: "", category_id: "", condition: "Good", serial_number: "", office_id: "", item_type: "equipment", stock: "", purchase_date: "", purchase_price: "", warranty_expiry: "", notes: "" });
+    setWarrantyPeriod("");
     setAddOpen(true);
   };
   const openEdit = (item) => {
@@ -250,7 +252,31 @@ export default function ItemsInventoryPage() {
       warranty_expiry: item.warranty_expiry || "",
       notes: item.notes || "",
     });
+    setWarrantyPeriod("");
     setEditOpen(true);
+  };
+
+  const computeWarrantyExpiry = (purchaseDate, period) => {
+    if (!purchaseDate || !period) return "";
+    const [amountStr, unit] = String(period).split("_");
+    const amount = parseInt(amountStr, 10);
+    if (!Number.isFinite(amount)) return "";
+
+    const base = new Date(`${purchaseDate}T00:00:00`);
+    if (Number.isNaN(base.getTime())) return "";
+
+    if (unit === "year") {
+      base.setFullYear(base.getFullYear() + amount);
+    } else if (unit === "month") {
+      base.setMonth(base.getMonth() + amount);
+    } else {
+      return "";
+    }
+
+    const yyyy = base.getFullYear();
+    const mm = String(base.getMonth() + 1).padStart(2, "0");
+    const dd = String(base.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   };
   const openTransfer = (item) => {
     setTransferItem(item);
@@ -1288,11 +1314,25 @@ export default function ItemsInventoryPage() {
               <MenuItem value="TEF Trust Fund">TEF Trust Fund</MenuItem>
               <MenuItem value="MDS/RAF">MDS/RAF</MenuItem>
             </TextField>
-            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
+            <TextField
+              label="Serial Number (Auto)"
+              value={form.serial_number || ""}
+              fullWidth
+              disabled
+              placeholder="Auto-generated on save"
+              helperText="No need to enter — system will auto-generate"
+            />
             <TextField select label="Condition" value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} fullWidth required>
               {['Excellent','Good','Fair','Needs Repair','Damaged','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
             </TextField>
-            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
+            <TextField
+              select
+              label="Office (Location)"
+              value={form.office_id}
+              onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))}
+              fullWidth
+              helperText="Optional — set after MR transfer"
+            >
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
             <TextField select label="Item Type" value={form.item_type} onChange={e => setForm(f => ({ ...f, item_type: e.target.value }))} fullWidth required>
@@ -1300,9 +1340,55 @@ export default function ItemsInventoryPage() {
               <MenuItem value="consumable">Consumable</MenuItem>
             </TextField>
             <TextField label="Stock Quantity" type="number" inputProps={{ min: 0, step: 1 }} value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} fullWidth required={form.item_type === 'consumable'} helperText={form.item_type === 'consumable' ? "Required for consumable items" : "Optional stock tracking"} />
-            <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField
+              label="Purchase Date"
+              type="date"
+              value={form.purchase_date}
+              onChange={e => {
+                const purchaseDate = e.target.value;
+                setForm(f => {
+                  const next = { ...f, purchase_date: purchaseDate };
+                  if (warrantyPeriod) {
+                    const computed = computeWarrantyExpiry(purchaseDate, warrantyPeriod);
+                    next.warranty_expiry = computed || next.warranty_expiry;
+                  }
+                  return next;
+                });
+              }}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
             <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
-            <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField
+              select
+              label="Warranty Period"
+              value={warrantyPeriod}
+              onChange={e => {
+                const period = e.target.value;
+                setWarrantyPeriod(period);
+                setForm(f => {
+                  const computed = computeWarrantyExpiry(f.purchase_date, period);
+                  return { ...f, warranty_expiry: computed || f.warranty_expiry };
+                });
+              }}
+              fullWidth
+              helperText="Optional — auto-sets expiry from purchase date"
+            >
+              <MenuItem value="">None / Manual</MenuItem>
+              <MenuItem value="6_month">6 months</MenuItem>
+              <MenuItem value="1_year">1 year</MenuItem>
+              <MenuItem value="2_year">2 years</MenuItem>
+              <MenuItem value="3_year">3 years</MenuItem>
+              <MenuItem value="5_year">5 years</MenuItem>
+            </TextField>
+            <TextField
+              label="Warranty Expiry"
+              type="date"
+              value={form.warranty_expiry}
+              onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
             <TextField label="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} fullWidth multiline minRows={2} />
           </Stack>
         </DialogContent>
@@ -1328,11 +1414,24 @@ export default function ItemsInventoryPage() {
               <MenuItem value="TEF Trust Fund">TEF Trust Fund</MenuItem>
               <MenuItem value="MDS/RAF">MDS/RAF</MenuItem>
             </TextField>
-            <TextField label="Serial Number" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} fullWidth />
+            <TextField
+              label="Serial Number"
+              value={form.serial_number || ""}
+              fullWidth
+              disabled
+              helperText="Auto-generated"
+            />
             <TextField select label="Condition" value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))} fullWidth required>
               {['Excellent','Good','Fair','Needs Repair','Damaged','Disposed'].map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
             </TextField>
-            <TextField select label="Office" value={form.office_id} onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))} fullWidth required>
+            <TextField
+              select
+              label="Office (Location)"
+              value={form.office_id}
+              onChange={e => setForm(f => ({ ...f, office_id: e.target.value }))}
+              fullWidth
+              helperText="Optional"
+            >
               {offices.map(o => <MenuItem key={o.id} value={o.id}>{o.name}</MenuItem>)}
             </TextField>
             <TextField select label="Item Type" value={form.item_type} onChange={e => setForm(f => ({ ...f, item_type: e.target.value }))} fullWidth required>
@@ -1340,9 +1439,55 @@ export default function ItemsInventoryPage() {
               <MenuItem value="consumable">Consumable</MenuItem>
             </TextField>
             <TextField label="Stock Quantity" type="number" inputProps={{ min: 0, step: 1 }} value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} fullWidth required={form.item_type === 'consumable'} helperText={form.item_type === 'consumable' ? "Required for consumable items" : "Optional stock tracking"} />
-            <TextField label="Purchase Date" type="date" value={form.purchase_date} onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField
+              label="Purchase Date"
+              type="date"
+              value={form.purchase_date}
+              onChange={e => {
+                const purchaseDate = e.target.value;
+                setForm(f => {
+                  const next = { ...f, purchase_date: purchaseDate };
+                  if (warrantyPeriod) {
+                    const computed = computeWarrantyExpiry(purchaseDate, warrantyPeriod);
+                    next.warranty_expiry = computed || next.warranty_expiry;
+                  }
+                  return next;
+                });
+              }}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
             <TextField label="Purchase Price" type="number" inputProps={{ step: "0.01" }} value={form.purchase_price} onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value }))} fullWidth />
-            <TextField label="Warranty Expiry" type="date" value={form.warranty_expiry} onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <TextField
+              select
+              label="Warranty Period"
+              value={warrantyPeriod}
+              onChange={e => {
+                const period = e.target.value;
+                setWarrantyPeriod(period);
+                setForm(f => {
+                  const computed = computeWarrantyExpiry(f.purchase_date, period);
+                  return { ...f, warranty_expiry: computed || f.warranty_expiry };
+                });
+              }}
+              fullWidth
+              helperText="Optional — auto-sets expiry from purchase date"
+            >
+              <MenuItem value="">None / Manual</MenuItem>
+              <MenuItem value="6_month">6 months</MenuItem>
+              <MenuItem value="1_year">1 year</MenuItem>
+              <MenuItem value="2_year">2 years</MenuItem>
+              <MenuItem value="3_year">3 years</MenuItem>
+              <MenuItem value="5_year">5 years</MenuItem>
+            </TextField>
+            <TextField
+              label="Warranty Expiry"
+              type="date"
+              value={form.warranty_expiry}
+              onChange={e => setForm(f => ({ ...f, warranty_expiry: e.target.value }))}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
             <TextField label="Notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} fullWidth multiline minRows={2} />
           </Stack>
         </DialogContent>

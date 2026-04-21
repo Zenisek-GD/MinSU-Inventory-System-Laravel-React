@@ -27,7 +27,7 @@ class RegisterUserRequest extends FormRequest
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'sometimes|string|in:admin,supply_officer,staff',
+            'role' => 'sometimes|string|in:admin,supply_officer,property_custodia,staff',
         ];
     }
 
@@ -53,7 +53,7 @@ class RegisterUserRequest extends FormRequest
     public function messages()
     {
         return [
-            'role.in' => 'The selected role is invalid. Must be one of: admin, supply_officer, staff.',
+            'role.in' => 'The selected role is invalid. Must be one of: admin, supply_officer, property_custodia, staff.',
         ];
     }
 

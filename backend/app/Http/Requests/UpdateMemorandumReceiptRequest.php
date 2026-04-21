@@ -11,9 +11,10 @@ class UpdateMemorandumReceiptRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Only the creator or admin can update an MR
+        // Only the creator, admin, or supply officer can update an MR
         $mr = $this->route('memorandumReceipt');
-        return $this->user()->role === 'Admin' || $this->user()->id === $mr->created_by;
+        $userRole = strtolower($this->user()->role ?? '');
+        return in_array($userRole, ['admin', 'supply_officer']) || $this->user()->id === $mr->created_by;
     }
 
     /**

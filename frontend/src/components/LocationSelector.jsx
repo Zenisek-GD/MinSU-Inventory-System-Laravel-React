@@ -18,7 +18,7 @@ export default function LocationSelector({ value, onChange, disabled }) {
     laboratory: { label: "Laboratory", emoji: "🔬" },
     studio: { label: "Studio/Workshop", emoji: "🎨" },
     lecture_hall: { label: "Lecture Hall", emoji: "🎓" },
-    office: { label: "General Office", emoji: "💼" },
+      office: { label: "General Office", emoji: "💼" },
     registrar: { label: "Registrar Office", emoji: "📋" },
     business_center: { label: "Business Center", emoji: "💰" },
     admin: { label: "Administration Office", emoji: "🏛️" },
@@ -39,7 +39,8 @@ export default function LocationSelector({ value, onChange, disabled }) {
 
   const getRoomDisplay = (room) => {
     const typeInfo = roomTypeMap[room.type] || { label: room.type, emoji: "🚪" };
-    return `${typeInfo.emoji} ${room.name} (${typeInfo.label})`;
+    const idPart = room.room_id ? `${room.room_id} — ` : "";
+    return `${typeInfo.emoji} ${idPart}${room.name} (${typeInfo.label})`;
   };
 
   useEffect(() => {

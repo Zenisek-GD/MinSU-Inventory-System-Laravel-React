@@ -29,6 +29,7 @@ const StockMovementsPage = lazy(() => import("./pages/StockMovements"));
 const StockDashboardPage = lazy(() => import("./pages/StockDashboard"));
 const StaffDashboardPage = lazy(() => import("./pages/StaffDashboard"));
 const MemorandumReceiptDetailPage = lazy(() => import("./pages/MemorandumReceiptDetail"));
+const ReceivedSuppliesLogPage = lazy(() => import("./pages/ReceivedSuppliesLog"));
 
 
 // ProtectedRoute wrapper component
@@ -46,6 +47,10 @@ const AppRoutes = () => {
 
   if (loading) return null;
 
+  const role = (user?.role || '').toLowerCase();
+  const isStaffLike = role === 'staff' || role === 'faculty';
+  const homePath = isStaffLike ? '/staff-dashboard' : '/dashboard';
+
   return (
     <>
       <SessionWarningDialog />
@@ -58,10 +63,10 @@ const AppRoutes = () => {
           } />
           <Route path="/borrow-item" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <BorrowsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -69,51 +74,56 @@ const AppRoutes = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <Dashboard />
+              {isStaffLike ? (
+                <Navigate to="/staff-dashboard" replace />
+              ) : (
+                <Dashboard />
+              )}
             </ProtectedRoute>
           } />
           <Route path="/staff-dashboard" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <StaffDashboardPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/offices" element={
             <ProtectedRoute>
-              {user && user.role === 'admin' ? (
+              {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <OfficesPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/departments" element={
             <ProtectedRoute>
-              {user && user.role === 'admin' ? (
+              {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <DepartmentsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/locations" element={
             <ProtectedRoute>
-              {user && user.role === 'admin' ? (
+              {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <LocationsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
+
           <Route path="/memorandum-receipts" element={
             <ProtectedRoute>
               {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                 <MemorandumReceiptsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -124,28 +134,28 @@ const AppRoutes = () => {
           } />
           <Route path="/my-requests" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <MyRequestsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/users" element={
             <ProtectedRoute>
-              {user && user.role === 'admin' ? (
+              {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <UsersPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/categories" element={
             <ProtectedRoute>
-              {user && user.role === 'admin' ? (
+              {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <CategoriesPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -155,7 +165,7 @@ const AppRoutes = () => {
                 {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                   <ItemsInventoryPage />
                 ) : (
-                  <Navigate to="/dashboard" />
+                  <Navigate to={homePath} replace />
                 )}
               </>
             </ProtectedRoute>
@@ -166,7 +176,7 @@ const AppRoutes = () => {
                 {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                   <ItemsInventoryPage />
                 ) : (
-                  <Navigate to="/dashboard" />
+                  <Navigate to={homePath} replace />
                 )}
               </>
             </ProtectedRoute>
@@ -177,7 +187,18 @@ const AppRoutes = () => {
                 {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                   <StockMovementsPage />
                 ) : (
-                  <Navigate to="/dashboard" />
+                  <Navigate to={homePath} replace />
+                )}
+              </>
+            </ProtectedRoute>
+          } />
+          <Route path="/received-supplies-log" element={
+            <ProtectedRoute>
+              <>
+                {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
+                  <ReceivedSuppliesLogPage />
+                ) : (
+                  <Navigate to={homePath} replace />
                 )}
               </>
             </ProtectedRoute>
@@ -188,17 +209,17 @@ const AppRoutes = () => {
                 {(user && (user.role === 'admin' || user.role === 'supply_officer')) ? (
                   <StockDashboardPage />
                 ) : (
-                  <Navigate to="/dashboard" />
+                  <Navigate to={homePath} replace />
                 )}
               </>
             </ProtectedRoute>
           } />
           <Route path="/request-item" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <RequestItemPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -208,26 +229,26 @@ const AppRoutes = () => {
                 {user && user.role === 'supply_officer' ? (
                   <div style={{ padding: 20 }}>Monitoring Page (to be implemented)</div>
                 ) : (
-                  <Navigate to="/dashboard" />
+                  <Navigate to={homePath} replace />
                 )}
               </>
             </ProtectedRoute>
           } />
           <Route path="/available-items" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <AvailableItemsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
           <Route path="/current-borrows" element={
             <ProtectedRoute>
-              {user && user.role === 'staff' ? (
+              {isStaffLike ? (
                 <CurrentBorrowsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -236,7 +257,7 @@ const AppRoutes = () => {
               {user && user.role === 'supply_officer' ? (
                 <div style={{ padding: 20 }}>Transaction Logs Page (to be implemented)</div>
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -245,7 +266,7 @@ const AppRoutes = () => {
               {user && user.role === 'supply_officer' ? (
                 <div style={{ padding: 20 }}>Return Processing Page (to be implemented)</div>
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -274,7 +295,7 @@ const AppRoutes = () => {
               {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <ReportsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
@@ -283,11 +304,11 @@ const AppRoutes = () => {
               {user && (user.role === 'admin' || user.role === 'supply_officer') ? (
                 <ConditionAuditsPage />
               ) : (
-                <Navigate to="/dashboard" />
+                <Navigate to={homePath} replace />
               )}
             </ProtectedRoute>
           } />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/" element={<Navigate to={user ? homePath : "/login"} replace />} />
           {/* 404 Route */}
           <Route path="*" element={
             <div style={{ padding: 20, textAlign: 'center' }}>

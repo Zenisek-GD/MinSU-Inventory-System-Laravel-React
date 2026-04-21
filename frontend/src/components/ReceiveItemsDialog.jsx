@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { fetchItems } from '../api/item';
 import api from '../api/axios';
+import { formatOfficeLabel } from '../utils/formatOfficeLabel';
 
 export default function ReceiveItemsDialog({ open, onClose, memorandumReceipt, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -108,7 +109,7 @@ export default function ReceiveItemsDialog({ open, onClose, memorandumReceipt, o
         
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>Office:</strong> {memorandumReceipt.office?.name || 'N/A'}
+            <strong>Office:</strong> {memorandumReceipt.office ? formatOfficeLabel(memorandumReceipt.office) : (memorandumReceipt.office || 'N/A')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             <strong>Purpose:</strong> {memorandumReceipt.purpose || 'N/A'}

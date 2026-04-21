@@ -183,6 +183,15 @@ class DatabaseSeeder extends Seeder
             'office_id' => $office1->id,
         ]);
 
+        // Create property custodian user (faculty/professor)
+        $propertyCustodia = User::create([
+            'name' => 'Dr. Maria Santos',
+            'email' => 'custodia@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'property_custodia',
+            'office_id' => $office1->id,
+        ]);
+
         // Create sample borrow records
         $laptop = Item::where('name', 'Dell Laptop')->first();
         $chair = Item::where('name', 'Office Chair')->first();

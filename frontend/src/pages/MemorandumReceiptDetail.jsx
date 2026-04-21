@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  MenuItem,
   Chip,
   Divider,
   ToggleButton,
@@ -43,7 +44,10 @@ import {
   updateProgressMR,
   acceptMemorandumReceipt,
   returnMemorandumReceipt,
+  transferMemorandumReceipt,
+  fetchMemorandumReceiptAuditLog,
 } from "../api/memorandumReceipt";
+import { useUser } from "../context/UserContext";
 import PrintIcon from "@mui/icons-material/Print";
 import DownloadIcon from "@mui/icons-material/Download";
 import BusinessIcon from "@mui/icons-material/Business";
@@ -66,6 +70,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ChecklistIcon from "@mui/icons-material/Checklist";
 import PublishedWithChangesIcon from "@mui/icons-material/PublishedWithChanges";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import ICSForm from "../components/ICSForm";
 import PARForm from "../components/PARForm";
 
@@ -113,6 +118,18 @@ const STATUS_CONFIG = {
     icon: <CheckCircleIcon />,
     label: "Completed"
   },
+  "turned in": {
+    color: "#2e7d32",
+    bgColor: "#e8f5e9",
+    icon: <CheckCircleIcon />,
+    label: "Turned In"
+  },
+  "returned": {
+    color: "#d32f2f",
+    bgColor: "#ffebee",
+    icon: <CancelIcon />,
+    label: "Returned"
+  },
   "rejected": {
     color: "#d32f2f",
     bgColor: "#ffebee",
@@ -130,11 +147,19 @@ const STATUS_CONFIG = {
 const MemorandumReceiptDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useUser();
+
+  const userRole = (user?.role || "").toLowerCase();
+  const isReadOnlyViewer = ["staff", "faculty"].includes(userRole);
 
   const [mr, setMr] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Procurement timeline (MR audit log)
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timeline, setTimeline] = useState([]);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
 
@@ -158,6 +183,15 @@ const MemorandumReceiptDetailPage = () => {
   const [returnItems, setReturnItems] = useState([]);
   const [returnNotes, setReturnNotes] = useState("");
 
+  // Transfer MR State
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    accountable_officer: "",
+    position: "",
+    office: "",
+    note: "",
+  });
+
   // Fetch MR details
   useEffect(() => {
     const fetchData = async () => {
@@ -177,6 +211,33 @@ const MemorandumReceiptDetailPage = () => {
 
     fetchData();
   }, [id]);
+
+  // Load timeline after MR loads (uses server-side authorization)
+  useEffect(() => {
+    const loadTimeline = async () => {
+      if (!id) return;
+      setTimelineLoading(true);
+      try {
+        const res = await fetchMemorandumReceiptAuditLog(id, { per_page: 50 });
+        const list = res?.data?.data || [];
+        setTimeline(Array.isArray(list) ? list : []);
+      } catch (e) {
+        // If unauthorized or no logs, keep timeline empty
+        setTimeline([]);
+      } finally {
+        setTimelineLoading(false);
+      }
+    };
+
+    loadTimeline();
+  }, [id]);
+
+  const formatTimelineAction = (action) => {
+    if (!action) return 'Activity';
+    return String(action)
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
 
   const getStatusConfig = (status) => {
     const key = status?.toLowerCase() || "pending review";
@@ -337,6 +398,49 @@ const MemorandumReceiptDetailPage = () => {
     setReturnDialogOpen(true);
   };
 
+  const canManage = ["admin", "supply_officer", "supply officer"].includes((user?.role || "").toLowerCase());
+  const canTransfer = canManage && mr?.status === "Completed";
+
+  const handleOpenTransferDialog = () => {
+    setTransferForm({
+      accountable_officer: "",
+      position: mr?.position || "",
+      office: mr?.office || "",
+      note: "",
+    });
+    setTransferDialogOpen(true);
+  };
+
+  const handleTransfer = async () => {
+    if (!transferForm.accountable_officer?.trim()) {
+      setError("Please enter the new accountable officer");
+      return;
+    }
+    if (!transferForm.note?.trim()) {
+      setError("Please enter a transfer note");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await transferMemorandumReceipt(id, {
+        accountable_officer: transferForm.accountable_officer,
+        position: transferForm.position || null,
+        office: transferForm.office || null,
+        note: transferForm.note,
+      });
+      const response = await fetchMemorandumReceipt(id);
+      setMr(response.data.mr);
+      setItems(response.data.items || response.data.mr?.items || []);
+      setTransferDialogOpen(false);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to transfer MR");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -366,7 +470,7 @@ const MemorandumReceiptDetailPage = () => {
           </Typography>
           <Button 
             variant="contained" 
-            onClick={() => navigate("/memorandum-receipts")}
+            onClick={() => navigate(isReadOnlyViewer ? "/my-requests" : "/memorandum-receipts")}
             startIcon={<ArrowBackIcon />}
             sx={{ borderRadius: 2 }}
           >
@@ -378,6 +482,13 @@ const MemorandumReceiptDetailPage = () => {
   }
 
   const statusConfig = getStatusConfig(mr.status);
+  const timelineEntries = (timeline && timeline.length > 0)
+    ? timeline
+    : (mr.audit_log || []);
+
+  const timelineEntriesChrono = Array.isArray(timelineEntries)
+    ? [...timelineEntries].reverse()
+    : [];
 
   return (
     <Fade in={true} timeout={500}>
@@ -475,7 +586,7 @@ const MemorandumReceiptDetailPage = () => {
                 <Button
                   variant="outlined"
                   startIcon={<ArrowBackIcon />}
-                  onClick={() => navigate("/memorandum-receipts")}
+                  onClick={() => navigate(isReadOnlyViewer ? "/my-requests" : "/memorandum-receipts")}
                   sx={{ borderRadius: 2, textTransform: 'none' }}
                 >
                   Back
@@ -715,45 +826,56 @@ const MemorandumReceiptDetailPage = () => {
           </TableContainer>
         </Paper>
 
-        {/* Audit Log */}
-        {mr.audit_log && mr.audit_log.length > 0 && (
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 3, 
-              mb: 4, 
-              borderRadius: 3,
-              border: '1px solid',
-              borderColor: 'divider'
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-              <Avatar sx={{ bgcolor: alpha('#7b1fa2', 0.1), color: '#7b1fa2' }}>
-                <HistoryIcon />
-              </Avatar>
-              <Typography variant="h6" fontWeight={600}>
-                Progress Timeline
-              </Typography>
-            </Box>
+        {/* MR Process Timeline */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 3, 
+            mb: 4, 
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+            <Avatar sx={{ bgcolor: alpha('#7b1fa2', 0.1), color: '#7b1fa2' }}>
+              <HistoryIcon />
+            </Avatar>
+            <Typography variant="h6" fontWeight={600}>
+              MR Process Timeline
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, ml: 6 }}>
+            Shows the recorded actions and status updates for this MR.
+          </Typography>
 
+          {timelineLoading && (
+            <Box sx={{ mb: 2 }}>
+              <LinearProgress />
+            </Box>
+          )}
+
+          {!timelineLoading && timelineEntriesChrono.length === 0 ? (
+            <Typography color="text.secondary">No timeline activity yet</Typography>
+          ) : (
             <Box sx={{ position: 'relative', ml: 2 }}>
-              {mr.audit_log.map((log, index) => (
+              {timelineEntriesChrono.map((log, index) => (
                 <Box key={index} sx={{ display: 'flex', gap: 2, mb: 3 }}>
                   <Box sx={{ position: 'relative' }}>
                     <Avatar
                       sx={{
                         width: 40,
                         height: 40,
-                        bgcolor: log.action === 'progress_update' ? alpha('#0288d1', 0.1) : alpha('#9e9e9e', 0.1),
-                        color: log.action === 'progress_update' ? '#0288d1' : '#9e9e9e',
+                        bgcolor: alpha('#0288d1', 0.1),
+                        color: '#0288d1',
                         border: '2px solid',
                         borderColor: 'white',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                       }}
                     >
-                      {log.action === 'progress_update' ? <UpdateIcon /> : <HistoryIcon />}
+                      <HistoryIcon />
                     </Avatar>
-                    {index < mr.audit_log.length - 1 && (
+                    {index < timelineEntriesChrono.length - 1 && (
                       <Box
                         sx={{
                           position: 'absolute',
@@ -772,145 +894,233 @@ const MemorandumReceiptDetailPage = () => {
                       sx={{ 
                         p: 2, 
                         borderRadius: 2,
-                        bgcolor: log.action === 'progress_update' ? alpha('#0288d1', 0.02) : 'transparent'
+                        bgcolor: alpha('#0288d1', 0.02)
                       }}
                     >
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                         <Box>
                           <Typography variant="subtitle2" fontWeight={600}>
-                            {log.action === 'progress_update' ? 'Progress Update' : log.action}
+                            {formatTimelineAction(log.action)}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            by {log.user_name}
+                            by {log.user_name || 'System'}
                           </Typography>
                         </Box>
                         <Typography variant="caption" color="text.secondary">
-                          {new Date(log.created_at).toLocaleString()}
+                          {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
                         </Typography>
                       </Box>
                       <Typography variant="body2">
-                        {log.description}
+                        {log.description || '—'}
                       </Typography>
                     </Paper>
                   </Box>
                 </Box>
               ))}
             </Box>
+          )}
+        </Paper>
+
+        {/* Action Buttons (hidden for staff/faculty view-only) */}
+        {!isReadOnlyViewer && (
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 2, 
+              borderRadius: 3,
+              bgcolor: alpha('#006400', 0.02),
+              border: '1px dashed',
+              borderColor: alpha('#006400', 0.3),
+              display: 'flex',
+              gap: 2,
+              justifyContent: 'flex-end',
+              flexWrap: 'wrap'
+            }}
+          >
+            {canManage && mr.status === "Pending Review" && (
+              <>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={handleApprove}
+                  disabled={updating}
+                  sx={{
+                    borderRadius: 2,
+                    px: 4,
+                    py: 1,
+                    textTransform: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Approve Request
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  startIcon={<CancelIcon />}
+                  onClick={() => setRejectionDialogOpen(true)}
+                  disabled={updating}
+                  sx={{
+                    borderRadius: 2,
+                    px: 4,
+                    py: 1,
+                    textTransform: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Reject Request
+                </Button>
+              </>
+            )}
+
+            {canManage && ["Processing", "Ready for Release", "Out for Delivery"].includes(mr.status) && (
+              <Button
+                variant="contained"
+                startIcon={<UpdateIcon />}
+                onClick={() => {
+                  setProgressStatus(mr.status);
+                  setProgressDialogOpen(true);
+                }}
+                disabled={updating}
+                sx={{
+                  borderRadius: 2,
+                  px: 4,
+                  py: 1,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)'
+                }}
+              >
+                Update Progress
+              </Button>
+            )}
+
+            {canManage && mr.status === "For Receiving" && (
+              <Button
+                variant="contained"
+                startIcon={<ChecklistIcon />}
+                onClick={() => setReceiveDialogOpen(true)}
+                disabled={updating}
+                sx={{
+                  borderRadius: 2,
+                  px: 4,
+                  py: 1,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #2e7d32 0%, #1b5a20 100%)'
+                }}
+              >
+                Receive & Sign
+              </Button>
+            )}
+
+            {mr.status === "Completed" && (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                {canTransfer && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<SwapHorizIcon />}
+                    onClick={handleOpenTransferDialog}
+                    disabled={updating}
+                    sx={{
+                      borderRadius: 2,
+                      px: 4,
+                      py: 1,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Transfer MR
+                  </Button>
+                )}
+
+                <Button
+                  variant="contained"
+                  startIcon={<PublishedWithChangesIcon />}
+                  onClick={handleOpenReturnDialog}
+                  disabled={updating}
+                  sx={{
+                    borderRadius: 2,
+                    px: 4,
+                    py: 1,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)'
+                  }}
+                >
+                  Return Items
+                </Button>
+              </Stack>
+            )}
           </Paper>
         )}
 
-        {/* Action Buttons */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 2, 
-            borderRadius: 3,
-            bgcolor: alpha('#006400', 0.02),
-            border: '1px dashed',
-            borderColor: alpha('#006400', 0.3),
-            display: 'flex',
-            gap: 2,
-            justifyContent: 'flex-end',
-            flexWrap: 'wrap'
-          }}
-        >
-          {mr.status === "Pending Review" && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<CheckCircleIcon />}
-                onClick={handleApprove}
-                disabled={updating}
-                sx={{
-                  borderRadius: 2,
-                  px: 4,
-                  py: 1,
-                  textTransform: 'none',
-                  fontWeight: 600
-                }}
-              >
-                Approve Request
+        {/* Transfer MR Dialog */}
+        {!isReadOnlyViewer && (
+          <Dialog
+            open={transferDialogOpen}
+            onClose={() => setTransferDialogOpen(false)}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{ sx: { borderRadius: 3 } }}
+          >
+            <DialogTitle sx={{ fontWeight: 700 }}>
+              Transfer Memorandum Receipt
+            </DialogTitle>
+            <DialogContent sx={{ pt: 2 }}>
+              <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                This will update the same MR and reassign linked inventory items.
+              </Alert>
+
+              <TextField
+                fullWidth
+                label="New Accountable Officer"
+                value={transferForm.accountable_officer}
+                onChange={(e) => setTransferForm((p) => ({ ...p, accountable_officer: e.target.value }))}
+                sx={{ mb: 2 }}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Position (optional)"
+                value={transferForm.position}
+                onChange={(e) => setTransferForm((p) => ({ ...p, position: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Office (optional)"
+                value={transferForm.office}
+                onChange={(e) => setTransferForm((p) => ({ ...p, office: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Transfer Note"
+                value={transferForm.note}
+                onChange={(e) => setTransferForm((p) => ({ ...p, note: e.target.value }))}
+                required
+              />
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setTransferDialogOpen(false)} disabled={updating}>
+                Cancel
               </Button>
               <Button
+                onClick={handleTransfer}
                 variant="contained"
-                color="error"
-                startIcon={<CancelIcon />}
-                onClick={() => setRejectionDialogOpen(true)}
                 disabled={updating}
-                sx={{
-                  borderRadius: 2,
-                  px: 4,
-                  py: 1,
-                  textTransform: 'none',
-                  fontWeight: 600
-                }}
+                startIcon={updating ? <CircularProgress size={18} /> : <SwapHorizIcon />}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
               >
-                Reject Request
+                Transfer
               </Button>
-            </>
-          )}
-
-          {["Processing", "Ready for Release", "Out for Delivery"].includes(mr.status) && (
-            <Button
-              variant="contained"
-              startIcon={<UpdateIcon />}
-              onClick={() => {
-                setProgressStatus(mr.status);
-                setProgressDialogOpen(true);
-              }}
-              disabled={updating}
-              sx={{
-                borderRadius: 2,
-                px: 4,
-                py: 1,
-                textTransform: 'none',
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)'
-              }}
-            >
-              Update Progress
-            </Button>
-          )}
-
-          {mr.status === "For Receiving" && (
-            <Button
-              variant="contained"
-              startIcon={<ChecklistIcon />}
-              onClick={() => setReceiveDialogOpen(true)}
-              disabled={updating}
-              sx={{
-                borderRadius: 2,
-                px: 4,
-                py: 1,
-                textTransform: 'none',
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #2e7d32 0%, #1b5a20 100%)'
-              }}
-            >
-              Receive & Sign
-            </Button>
-          )}
-
-          {mr.status === "Completed" && (
-            <Button
-              variant="contained"
-              startIcon={<PublishedWithChangesIcon />}
-              onClick={handleOpenReturnDialog}
-              disabled={updating}
-              sx={{
-                borderRadius: 2,
-                px: 4,
-                py: 1,
-                textTransform: 'none',
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)'
-              }}
-            >
-              Return Items
-            </Button>
-          )}
-        </Paper>
+            </DialogActions>
+          </Dialog>
+        )}
 
         {/* Print Preview Dialog */}
         <Dialog
@@ -1027,309 +1237,313 @@ const MemorandumReceiptDetailPage = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Update Progress Dialog */}
-        <Dialog 
-          open={progressDialogOpen} 
-          onClose={() => setProgressDialogOpen(false)} 
-          maxWidth="sm" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle sx={{ 
-            fontWeight: 700,
-            bgcolor: alpha('#006400', 0.04),
-            borderBottom: '1px solid',
-            borderColor: 'divider'
-          }}>
-            Update Progress
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <TextField
-              select
+        {!isReadOnlyViewer && (
+          <>
+            {/* Update Progress Dialog */}
+            <Dialog 
+              open={progressDialogOpen} 
+              onClose={() => setProgressDialogOpen(false)} 
+              maxWidth="sm" 
               fullWidth
-              label="Current Status"
-              sx={{ mb: 3 }}
-              value={progressStatus}
-              onChange={(e) => setProgressStatus(e.target.value)}
-              SelectProps={{ native: true }}
+              PaperProps={{ sx: { borderRadius: 3 } }}
             >
-              <option value="Processing">Processing</option>
-              <option value="Ready for Release">Ready for Release</option>
-              <option value="Out for Delivery">Out for Delivery</option>
-              <option value="For Receiving">For Receiving</option>
-            </TextField>
-            <TextField
-              fullWidth
-              label="Progress Notes"
-              value={progressNotes}
-              onChange={(e) => setProgressNotes(e.target.value)}
-              multiline
-              rows={4}
-              placeholder="Add details about the current progress..."
-              variant="outlined"
-            />
-          </DialogContent>
-          <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button 
-              onClick={() => setProgressDialogOpen(false)}
-              sx={{ borderRadius: 2 }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUpdateProgress} 
-              variant="contained" 
-              disabled={updating}
-              sx={{ 
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)'
-              }}
-            >
-              {updating ? <CircularProgress size={24} /> : 'Update Progress'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Rejection Dialog */}
-        <Dialog 
-          open={rejectionDialogOpen} 
-          onClose={() => setRejectionDialogOpen(false)} 
-          maxWidth="sm" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle sx={{ 
-            fontWeight: 700,
-            bgcolor: alpha('#d32f2f', 0.04),
-            color: '#d32f2f',
-            borderBottom: '1px solid',
-            borderColor: 'divider'
-          }}>
-            Reject Memorandum Receipt
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <TextField
-              fullWidth
-              label="Reason for Rejection"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              multiline
-              rows={4}
-              required
-              placeholder="Please provide a detailed reason for rejection..."
-            />
-          </DialogContent>
-          <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button 
-              onClick={() => setRejectionDialogOpen(false)}
-              sx={{ borderRadius: 2 }}
-            >
-              Cancel1
-            </Button>
-            <Button 
-              onClick={handleReject} 
-              variant="contained" 
-              color="error"
-              disabled={updating}
-              sx={{ borderRadius: 2 }}
-            >
-              {updating ? <CircularProgress size={24} /> : 'Confirm Rejection'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Receive Items Dialog */}
-        <Dialog 
-          open={receiveDialogOpen} 
-          onClose={() => setReceiveDialogOpen(false)} 
-          maxWidth="sm" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle sx={{ 
-            fontWeight: 700,
-            bgcolor: alpha('#2e7d32', 0.04),
-            color: '#2e7d32',
-            borderBottom: '1px solid',
-            borderColor: 'divider'
-          }}>
-            Receive Memorandum Receipt Items
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-              By signing below, you confirm receipt of all items listed in this Memorandum Receipt and accept responsibility for their custody and safekeeping.
-            </Alert>
-            <Box sx={{ 
-              p: 2, 
-              bgcolor: alpha('#2e7d32', 0.05), 
-              borderRadius: 2, 
-              border: '1px solid',
-              borderColor: alpha('#2e7d32', 0.2)
-            }}>
-              <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
-                Items to Receive:
-              </Typography>
-              <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
-                {items?.map((item, idx) => (
-                  <Box 
-                    key={idx}
-                    sx={{ 
-                      py: 1, 
-                      px: 1.5, 
-                      borderBottom: '1px solid',
-                      borderColor: alpha('#000', 0.1),
-                      '&:last-child': { borderBottom: 'none' }
-                    }}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2">
-                        {item.item_name} ({item.qty} {item.unit})
-                      </Typography>
-                      <Chip 
-                        label={item.condition} 
-                        size="small" 
-                        variant="outlined"
-                        sx={{ fontWeight: 600 }}
-                      />
-                    </Stack>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button 
-              onClick={() => setReceiveDialogOpen(false)}
-              sx={{ borderRadius: 2 }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleReceive} 
-              variant="contained" 
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              disabled={updating}
-              sx={{ borderRadius: 2 }}
-            >
-              {updating ? <CircularProgress size={24} /> : 'Confirm Receipt & Sign'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Return Items Dialog */}
-        <Dialog 
-          open={returnDialogOpen} 
-          onClose={() => setReturnDialogOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle sx={{ 
-            fontWeight: 700,
-            bgcolor: alpha('#ed6c02', 0.04),
-            color: '#ed6c02',
-            borderBottom: '1px solid',
-            borderColor: 'divider'
-          }}>
-            Return Memorandum Receipt Items
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-              Please review the condition of each item before returning. Your assessment will be recorded.
-            </Alert>
-            
-            <TextField
-              type="date"
-              label="Return Date"
-              value={returnDate}
-              onChange={(e) => setReturnDate(e.target.value)}
-              fullWidth
-              required
-              sx={{ mb: 3 }}
-              InputLabelProps={{ shrink: true }}
-            />
-
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
-              Item Conditions:
-            </Typography>
-
-            <Box sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
-              {items?.map((item, idx) => (
-                <Paper 
-                  key={idx}
+              <DialogTitle sx={{ 
+                fontWeight: 700,
+                bgcolor: alpha('#006400', 0.04),
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}>
+                Update Progress
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Current Status"
+                  sx={{ mb: 3 }}
+                  value={progressStatus}
+                  onChange={(e) => setProgressStatus(e.target.value)}
+                  SelectProps={{ native: true }}
+                >
+                  <option value="Processing">Processing</option>
+                  <option value="Ready for Release">Ready for Release</option>
+                  <option value="Out for Delivery">Out for Delivery</option>
+                  <option value="For Receiving">For Receiving</option>
+                </TextField>
+                <TextField
+                  fullWidth
+                  label="Progress Notes"
+                  value={progressNotes}
+                  onChange={(e) => setProgressNotes(e.target.value)}
+                  multiline
+                  rows={4}
+                  placeholder="Add details about the current progress..."
                   variant="outlined"
+                />
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button 
+                  onClick={() => setProgressDialogOpen(false)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdateProgress} 
+                  variant="contained" 
+                  disabled={updating}
                   sx={{ 
-                    p: 2, 
-                    mb: 2, 
                     borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider'
+                    background: 'linear-gradient(135deg, #006400 0%, #004d00 100%)'
                   }}
                 >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {item.item_name}
-                    </Typography>
-                    <Chip label={`Qty: ${item.qty}`} size="small" variant="outlined" />
-                  </Stack>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Return Condition"
-                    value={returnItems[idx]?.return_condition || item.condition || "Good"}
-                    onChange={(e) => {
-                      const newItems = [...returnItems];
-                      newItems[idx] = { ...newItems[idx], return_condition: e.target.value };
-                      setReturnItems(newItems);
-                    }}
-                    sx={{ mt: 1 }}
-                  >
-                    <MenuItem value="Excellent">Excellent</MenuItem>
-                    <MenuItem value="Good">Good</MenuItem>
-                    <MenuItem value="Fair">Fair</MenuItem>
-                    <MenuItem value="Needs Repair">Needs Repair</MenuItem>
-                    <MenuItem value="Damaged">Damaged</MenuItem>
-                    <MenuItem value="Disposed">Disposed</MenuItem>
-                  </TextField>
-                </Paper>
-              ))}
-            </Box>
+                  {updating ? <CircularProgress size={24} /> : 'Update Progress'}
+                </Button>
+              </DialogActions>
+            </Dialog>
 
-            <TextField
+            {/* Rejection Dialog */}
+            <Dialog 
+              open={rejectionDialogOpen} 
+              onClose={() => setRejectionDialogOpen(false)} 
+              maxWidth="sm" 
               fullWidth
-              label="Return Notes (Optional)"
-              value={returnNotes}
-              onChange={(e) => setReturnNotes(e.target.value)}
-              multiline
-              rows={3}
-              placeholder="Add any additional notes about the returned items..."
-              sx={{ mb: 2 }}
-            />
-          </DialogContent>
-          <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button 
-              onClick={() => setReturnDialogOpen(false)}
-              sx={{ borderRadius: 2 }}
+              PaperProps={{ sx: { borderRadius: 3 } }}
             >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleReturn} 
-              variant="contained" 
-              startIcon={<PublishedWithChangesIcon />}
-              disabled={updating}
-              sx={{ 
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)',
-                color: 'white'
-              }}
+              <DialogTitle sx={{ 
+                fontWeight: 700,
+                bgcolor: alpha('#d32f2f', 0.04),
+                color: '#d32f2f',
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}>
+                Reject Memorandum Receipt
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <TextField
+                  fullWidth
+                  label="Reason for Rejection"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  multiline
+                  rows={4}
+                  required
+                  placeholder="Please provide a detailed reason for rejection..."
+                />
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button 
+                  onClick={() => setRejectionDialogOpen(false)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleReject} 
+                  variant="contained" 
+                  color="error"
+                  disabled={updating}
+                  sx={{ borderRadius: 2 }}
+                >
+                  {updating ? <CircularProgress size={24} /> : 'Confirm Rejection'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Receive Items Dialog */}
+            <Dialog 
+              open={receiveDialogOpen} 
+              onClose={() => setReceiveDialogOpen(false)} 
+              maxWidth="sm" 
+              fullWidth
+              PaperProps={{ sx: { borderRadius: 3 } }}
             >
-              {updating ? <CircularProgress size={24} /> : 'Confirm Return'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+              <DialogTitle sx={{ 
+                fontWeight: 700,
+                bgcolor: alpha('#2e7d32', 0.04),
+                color: '#2e7d32',
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}>
+                Receive Memorandum Receipt Items
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                  By signing below, you confirm receipt of all items listed in this Memorandum Receipt and accept responsibility for their custody and safekeeping.
+                </Alert>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: alpha('#2e7d32', 0.05), 
+                  borderRadius: 2, 
+                  border: '1px solid',
+                  borderColor: alpha('#2e7d32', 0.2)
+                }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                    Items to Receive:
+                  </Typography>
+                  <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                    {items?.map((item, idx) => (
+                      <Box 
+                        key={idx}
+                        sx={{ 
+                          py: 1, 
+                          px: 1.5, 
+                          borderBottom: '1px solid',
+                          borderColor: alpha('#000', 0.1),
+                          '&:last-child': { borderBottom: 'none' }
+                        }}
+                      >
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2">
+                            {item.item_name} ({item.qty} {item.unit})
+                          </Typography>
+                          <Chip 
+                            label={item.condition} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button 
+                  onClick={() => setReceiveDialogOpen(false)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleReceive} 
+                  variant="contained" 
+                  color="success"
+                  startIcon={<CheckCircleIcon />}
+                  disabled={updating}
+                  sx={{ borderRadius: 2 }}
+                >
+                  {updating ? <CircularProgress size={24} /> : 'Confirm Receipt & Sign'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Return Items Dialog */}
+            <Dialog 
+              open={returnDialogOpen} 
+              onClose={() => setReturnDialogOpen(false)} 
+              maxWidth="md" 
+              fullWidth
+              PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+              <DialogTitle sx={{ 
+                fontWeight: 700,
+                bgcolor: alpha('#ed6c02', 0.04),
+                color: '#ed6c02',
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}>
+                Return Memorandum Receipt Items
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                  Please review the condition of each item before returning. Your assessment will be recorded.
+                </Alert>
+                
+                <TextField
+                  type="date"
+                  label="Return Date"
+                  value={returnDate}
+                  onChange={(e) => setReturnDate(e.target.value)}
+                  fullWidth
+                  required
+                  sx={{ mb: 3 }}
+                  InputLabelProps={{ shrink: true }}
+                />
+
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>
+                  Item Conditions:
+                </Typography>
+
+                <Box sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
+                  {items?.map((item, idx) => (
+                    <Paper 
+                      key={idx}
+                      variant="outlined"
+                      sx={{ 
+                        p: 2, 
+                        mb: 2, 
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider'
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {item.item_name}
+                        </Typography>
+                        <Chip label={`Qty: ${item.qty}`} size="small" variant="outlined" />
+                      </Stack>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        label="Return Condition"
+                        value={returnItems[idx]?.return_condition || item.condition || "Good"}
+                        onChange={(e) => {
+                          const newItems = [...returnItems];
+                          newItems[idx] = { ...newItems[idx], return_condition: e.target.value };
+                          setReturnItems(newItems);
+                        }}
+                        sx={{ mt: 1 }}
+                      >
+                        <MenuItem value="Excellent">Excellent</MenuItem>
+                        <MenuItem value="Good">Good</MenuItem>
+                        <MenuItem value="Fair">Fair</MenuItem>
+                        <MenuItem value="Needs Repair">Needs Repair</MenuItem>
+                        <MenuItem value="Damaged">Damaged</MenuItem>
+                        <MenuItem value="Disposed">Disposed</MenuItem>
+                      </TextField>
+                    </Paper>
+                  ))}
+                </Box>
+
+                <TextField
+                  fullWidth
+                  label="Return Notes (Optional)"
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
+                  multiline
+                  rows={3}
+                  placeholder="Add any additional notes about the returned items..."
+                  sx={{ mb: 2 }}
+                />
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button 
+                  onClick={() => setReturnDialogOpen(false)}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleReturn} 
+                  variant="contained" 
+                  startIcon={<PublishedWithChangesIcon />}
+                  disabled={updating}
+                  sx={{ 
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)',
+                    color: 'white'
+                  }}
+                >
+                  {updating ? <CircularProgress size={24} /> : 'Confirm Return'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </>
+        )}
       </Container>
     </Fade>
   );

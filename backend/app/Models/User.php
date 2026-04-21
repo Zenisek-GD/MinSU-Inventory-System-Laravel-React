@@ -15,6 +15,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable, HasApiTokens, SoftDeletes;
     const ROLE_ADMIN = 'admin';
     const ROLE_SUPPLY_OFFICER = 'supply_officer';
+    const ROLE_PROPERTY_CUSTODIA = 'property_custodia';
     const ROLE_STAFF = 'staff';
 
     /**
@@ -73,6 +74,11 @@ class User extends Authenticatable
         return $this->role === self::ROLE_SUPPLY_OFFICER;
     }
 
+    public function isPropertyCustodia(): bool
+    {
+        return $this->role === self::ROLE_PROPERTY_CUSTODIA;
+    }
+
     public function isStaff(): bool
     {
         return $this->role === self::ROLE_STAFF;
@@ -82,6 +88,11 @@ class User extends Authenticatable
     public function scopeAdmins($query)
     {
         return $query->where('role', self::ROLE_ADMIN);
+    }
+
+    public function scopePropertyCustodias($query)
+    {
+        return $query->where('role', self::ROLE_PROPERTY_CUSTODIA);
     }
 
     public function scopeSupplyOfficers($query)

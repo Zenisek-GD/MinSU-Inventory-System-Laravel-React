@@ -285,8 +285,8 @@ class ReportsController extends Controller
                     'link' => $notif->action_link ?? '/memorandum-receipts',
                 ];
             }
-        } elseif ($user && $user->role === 'staff') {
-            // Get MR-related notifications for staff (approvals/rejections of their MRs)
+        } elseif ($user && in_array($user->role, ['staff', 'property_custodia'])) {
+            // Get MR-related notifications for staff and property_custodia (approvals/rejections of their MRs)
             $mrNotifications = Notification::where('user_id', $user->id)
                 ->whereIn('type', ['mr_approved', 'mr_rejected'])
                 ->whereNull('read_at')

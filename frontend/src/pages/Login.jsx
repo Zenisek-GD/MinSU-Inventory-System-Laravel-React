@@ -25,7 +25,7 @@ export default function LoginForm() {
       console.log('Profile response:', profileRes);
       const userData = profileRes.data?.user || profileRes.user;
       setUser(userData);
-      navigate("/dashboard");
+      navigate(['staff', 'faculty'].includes((userData?.role || '').toLowerCase()) ? "/staff-dashboard" : "/dashboard");
     } catch (err) {
       console.error("Login error:", err);
       const errorMessage = err.message || err.error || err.data?.message || "Login failed";

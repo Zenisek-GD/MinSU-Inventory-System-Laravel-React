@@ -87,6 +87,17 @@ export const returnMemorandumReceipt = async (id, data) => {
   return response.data;
 };
 
+// Transfer MR accountability (Admin/Supply Officer)
+export const transferMemorandumReceipt = async (id, data) => {
+  const response = await api.post(`/memorandum-receipts/${id}/transfer`, data);
+  return response.data;
+};
+
+export const fetchMemorandumReceiptAuditLog = async (id, params = {}) => {
+  const response = await api.get(`/memorandum-receipts/${id}/audit-log`, { params });
+  return response.data;
+};
+
 export const deleteMemorandumReceipt = async (id) => {
   const response = await api.delete(`/memorandum-receipts/${id}`);
   return response.data;

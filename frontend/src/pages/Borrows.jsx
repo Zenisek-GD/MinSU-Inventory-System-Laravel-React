@@ -895,7 +895,15 @@ const BorrowsPage = () => {
                               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                 <Chip label={sel.condition || 'Good'} size="small" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
                                 {sel.serial_number && <Chip label={`S/N: ${sel.serial_number}`} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} />}
-                                {sel.office?.name && <Chip icon={<InfoIcon sx={{ fontSize: 14 }} />} label={sel.office.name} size="small" variant="outlined" color="info" />}
+                                {sel.office?.name && (
+                                  <Chip
+                                    icon={<InfoIcon sx={{ fontSize: 14 }} />}
+                                    label={`${sel.office.room_id ? `${sel.office.room_id} — ` : ''}${sel.office.name}`}
+                                    size="small"
+                                    variant="outlined"
+                                    color="info"
+                                  />
+                                )}
                                 <Chip
                                   label={`Qty available: ${sel.stock ?? sel.quantity ?? '—'}`}
                                   size="small"
@@ -941,7 +949,14 @@ const BorrowsPage = () => {
                   </Grid>
                   {user?.office?.name && (
                     <Grid item xs={12}>
-                      <TextField fullWidth size="small" label="Office / Department" value={user.office.name} InputProps={{ readOnly: true }} helperText="Auto-filled from your account" />
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Office / Department"
+                        value={`${user.office.room_id ? `${user.office.room_id} — ` : ''}${user.office.name}`}
+                        InputProps={{ readOnly: true }}
+                        helperText="Auto-filled from your account"
+                      />
                     </Grid>
                   )}
                 </Grid>

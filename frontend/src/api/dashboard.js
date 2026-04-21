@@ -1,16 +1,11 @@
 import api from "./axios";
 
 export const fetchDashboardStats = async () => {
-  const [users, offices, items, memorandumReceipts] = await Promise.all([
-    api.get("/users/role-counts"),
-    api.get("/offices"),
-    api.get("/items"),
-    api.get("/memorandum-receipts")
-  ]);
-  return {
-    users: users.data,
-    offices: offices.data,
-    items: items.data,
-    memorandumReceipts: memorandumReceipts.data
-  };
+  const { data } = await api.get('/dashboard/stats');
+  return data;
+};
+
+export const fetchDashboardMrTimeline = async (params = {}) => {
+  const { data } = await api.get('/dashboard/mr-timeline', { params });
+  return data?.data || [];
 };

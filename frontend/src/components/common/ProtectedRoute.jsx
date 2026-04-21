@@ -16,7 +16,12 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" />;
+    return (
+      <Navigate
+        to={['staff', 'faculty'].includes((user.role || '').toLowerCase()) ? '/staff-dashboard' : '/dashboard'}
+        replace
+      />
+    );
   }
 
   return children;

@@ -413,6 +413,8 @@ const MemorandumReceiptsPage = () => {
       case "cancelled":
       case "returned":
         return "error";
+      case "turned in":
+        return "success";
       case "pending review":
         return "warning";
       case "processing":
@@ -435,6 +437,8 @@ const MemorandumReceiptsPage = () => {
         return <ScheduleIcon fontSize="small" />;
       case "processing":
         return <AssignmentTurnedInIcon fontSize="small" />;
+      case "turned in":
+        return <CheckCircleOutlineIcon fontSize="small" />;
       default: return <ArticleIcon fontSize="small" />;
     }
   };

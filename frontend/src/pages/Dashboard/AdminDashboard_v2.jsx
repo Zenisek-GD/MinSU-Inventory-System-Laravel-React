@@ -117,7 +117,7 @@ export default function AdminDashboard() {
           <Grid item xs={12} sm={6} md={3}>
             <DashboardCard
               title="Offices"
-              value={stats?.offices?.data?.length || 0}
+              value={stats?.officesCount || 0}
               icon={<OfficeIcon />}
               subtitle="Departments/locations"
               color="#ff9800"
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
           <Grid item xs={12} sm={6} md={3}>
             <DashboardCard
               title="Total Items"
-              value={stats?.items?.length || 0}
+              value={stats?.itemsCount || 0}
               icon={<InventoryIcon />}
               subtitle="In inventory"
               color="#4caf50"
@@ -137,13 +137,7 @@ export default function AdminDashboard() {
           <Grid item xs={12} sm={6} md={3}>
             <DashboardCard
               title="Pending Requests"
-              value={
-                Array.isArray(stats?.memorandumReceipts) 
-                  ? stats.memorandumReceipts.filter((mr) => mr.status === 'Issued').length 
-                  : (Array.isArray(stats?.memorandumReceipts?.data)
-                      ? stats.memorandumReceipts.data.filter((mr) => mr.status === 'Issued').length
-                      : 0)
-              }
+              value={stats?.pendingMemorandumReceiptsCount || 0}
               icon={<ShoppingCartIcon />}
               subtitle="Awaiting approval"
               color="#f44336"
@@ -276,8 +270,13 @@ export default function AdminDashboard() {
           <Grid item xs={12} md={6}>
             <Card>
               <CardHeader
-                title="Recent Activities"
+                title="Recent Memorandum Receipts"
                 titleTypographyProps={{ variant: 'h6', fontWeight: '600' }}
+                action={
+                  <Button size="small" endIcon={<ArrowIcon />} onClick={() => navigate('/memorandum-receipts')}>
+                    View all
+                  </Button>
+                }
                 sx={{
                   pb: 2,
                   borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
@@ -285,23 +284,37 @@ export default function AdminDashboard() {
               />
               <CardContent>
                 <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  {[
-                    { action: 'New user registered', time: '2 minutes ago', icon: <PeopleIcon /> },
-                    { action: 'Inventory updated', time: '15 minutes ago', icon: <InventoryIcon /> },
-                    { action: 'Report generated', time: '1 hour ago', icon: <TrendingIcon /> },
-                  ].map((item, idx) => (
-                    <ListItem key={idx} sx={{ py: 1 }}>
+                  {(stats?.recentMemorandumReceipts || []).length === 0 ? (
+                    <ListItem sx={{ py: 1 }}>
                       <ListItemIcon sx={{ minWidth: 40, color: '#006400' }}>
-                        {item.icon}
+                        <InfoIcon />
                       </ListItemIcon>
                       <ListItemText
-                        primary={item.action}
-                        secondary={item.time}
+                        primary="No memorandum receipts yet"
+                        secondary="Go to Memorandum Receipts to create one"
                         primaryTypographyProps={{ variant: 'body2', fontWeight: '500' }}
                         secondaryTypographyProps={{ variant: 'caption' }}
                       />
                     </ListItem>
-                  ))}
+                  ) : (
+                    (stats?.recentMemorandumReceipts || []).map((mr) => (
+                      <ListItem
+                        key={mr.id}
+                        sx={{ py: 1, cursor: 'pointer' }}
+                        onClick={() => navigate(`/memorandum-receipts/${mr.id}`)}
+                      >
+                        <ListItemIcon sx={{ minWidth: 40, color: '#006400' }}>
+                          <ShoppingCartIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={`${mr.mr_number || `MR-${mr.id}`} · ${(mr.form_type || 'ics').toUpperCase()}`}
+                          secondary={`${mr.office || 'N/A'} • ${mr.status || 'N/A'}${mr.created_at ? ` • ${new Date(mr.created_at).toLocaleString()}` : ''}`}
+                          primaryTypographyProps={{ variant: 'body2', fontWeight: '600' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                      </ListItem>
+                    ))
+                  )}
                 </List>
               </CardContent>
             </Card>

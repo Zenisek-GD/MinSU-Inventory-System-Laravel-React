@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import DashboardLayout from "../components/Layout/DashboardLayout";
@@ -7,7 +7,6 @@ import { DashboardSkeleton } from "../components/common/SkeletonLoader";
 // Import new v2 dashboards
 import AdminDashboard from "./Dashboard/AdminDashboard_v2";
 import StaffDashboard from "./Dashboard/StaffDashboard_v2";
-import SupplyOfficerDashboard from "./Dashboard/SupplyOfficerDashboard_v2";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -27,10 +26,8 @@ export default function Dashboard() {
   }
 
   // Render based on role
-  if (user.role === 'admin') {
+  if (user.role === 'admin' || user.role === 'supply_officer') {
     return <AdminDashboard />;
-  } else if (user.role === 'supply_officer') {
-    return <SupplyOfficerDashboard />;
   } else {
     return <StaffDashboard />;
   }

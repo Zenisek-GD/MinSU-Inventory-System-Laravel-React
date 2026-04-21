@@ -36,10 +36,30 @@ class MemorandumReceiptController extends Controller
     {
         $query = MemorandumReceipt::with('items');
 
+        $user = $request->user();
+        $userRole = strtolower($user->role ?? '');
+        $isManagement = in_array($userRole, ['admin', 'supply_officer', 'supply officer', 'property_custodia']);
+
+        // For non-management users, only show MRs they created or where they are the accountable officer
+        if (!$isManagement) {
+            $query->where(function ($q) use ($user) {
+                $q->where('created_by', $user->id)
+                    ->orWhereRaw('LOWER(accountable_officer) = ?', [strtolower($user->name ?? '')]);
+            });
+        }
+
         // Filter by status
         if ($request->has('status')) {
             $query->byStatus($request->status);
         }
+        // Filter by requested_by (frontend uses this to mean created_by)
+        if ($request->has('requested_by')) {
+            $requestedBy = (int) $request->query('requested_by');
+            if ($isManagement || $requestedBy === (int) $user->id) {
+                $query->byCreatedUser($requestedBy);
+            }
+        }
+
 
         // Filter by office
         if ($request->has('office')) {
@@ -465,6 +485,11 @@ class MemorandumReceiptController extends Controller
             return $this->unauthorized('Only the accountable officer can return this MR');
         }
 
+        // Only allow turn-in for issued/completed MRs
+        if ($mr->status !== MemorandumReceipt::STATUS_COMPLETED) {
+            return $this->error('Only Completed Memorandum Receipts can be turned in', 422);
+        }
+
         // Validate input
         $validated = $request->validate([
             'return_date' => 'required|date',
@@ -479,6 +504,17 @@ class MemorandumReceiptController extends Controller
         try {
             $returnedCount = 0;
             $returnedItemsInfo = '';
+
+            // Ensure all submitted items belong to this MR
+            $submittedMrItemIds = collect($validated['items'])->pluck('id')->unique()->values();
+            $ownedCount = MRItem::query()
+                ->where('mr_id', $mr->id)
+                ->whereIn('id', $submittedMrItemIds)
+                ->count();
+
+            if ($ownedCount !== $submittedMrItemIds->count()) {
+                return $this->error('One or more items do not belong to this Memorandum Receipt', 422);
+            }
 
             // Process each returned item
             foreach ($validated['items'] as $itemData) {
@@ -524,8 +560,10 @@ class MemorandumReceiptController extends Controller
                 }
             }
 
-            // Update MR status to Returned
-            $mr->transitionStatus(MemorandumReceipt::STATUS_RETURNED, user: $request->user());
+            // Update MR status to Turned In
+            if (!$mr->transitionStatus(MemorandumReceipt::STATUS_TURNED_IN, user: $request->user())) {
+                return $this->error('Failed to update MR status to Turned In', 422);
+            }
 
             // Notify supply officers about the return
             Notification::notifyMRReturned($mr, $request->user(), "Returned {$returnedCount} item(s): {$returnedItemsInfo}");
@@ -552,6 +590,104 @@ class MemorandumReceiptController extends Controller
     }
 
     /**
+     * Transfer MR accountability to a new accountable officer (Admin/Supply Officer only)
+     * Updates the MR header and reassigns linked inventory items.
+     */
+    public function transfer(Request $request, int $id): JsonResponse
+    {
+        $mr = MemorandumReceipt::with('items')->find($id);
+
+        if (!$mr) {
+            return $this->notFound('Memorandum Receipt not found');
+        }
+
+        $userRole = strtolower($request->user()->role ?? '');
+        if (!in_array($userRole, ['admin', 'supply_officer', 'supply officer'])) {
+            return $this->unauthorized('Only Supply Officers and Admins can transfer MRs');
+        }
+
+        // Only allow transfer for active issued MRs
+        if ($mr->status !== MemorandumReceipt::STATUS_COMPLETED) {
+            return $this->error('Only Completed (issued) Memorandum Receipts can be transferred', 422);
+        }
+
+        $validated = $request->validate([
+            'accountable_officer' => 'required|string|max:255',
+            'position' => 'nullable|string|max:255',
+            'office' => 'nullable|string|max:255',
+            'note' => 'required|string|max:1000',
+        ]);
+
+        $oldAccountableOfficer = $mr->accountable_officer;
+        $oldOffice = $mr->office;
+        $oldPosition = $mr->position;
+
+        DB::beginTransaction();
+
+        try {
+            $mr->accountable_officer = $validated['accountable_officer'];
+            if (array_key_exists('position', $validated) && $validated['position'] !== null) {
+                $mr->position = $validated['position'];
+            }
+            if (array_key_exists('office', $validated) && $validated['office'] !== null) {
+                $mr->office = $validated['office'];
+            }
+            $mr->updated_by = $request->user()->id;
+            $mr->save();
+
+            // Re-assign linked inventory items
+            foreach ($mr->items as $mrItem) {
+                if (!$mrItem->item_id) {
+                    continue;
+                }
+
+                $inventoryItem = Item::find($mrItem->item_id);
+                if (!$inventoryItem) {
+                    continue;
+                }
+
+                $inventoryItem->assigned_to = $mr->accountable_officer;
+                // Keep as issued/borrowed while MR is completed
+                if ($inventoryItem->status === 'In Stock' || $inventoryItem->status === 'Available') {
+                    $inventoryItem->status = 'Borrowed';
+                }
+                $inventoryItem->save();
+            }
+
+            $desc = "MR {$mr->mr_number} transferred from {$oldAccountableOfficer} to {$mr->accountable_officer}.";
+            if ($oldOffice !== $mr->office) {
+                $desc .= " Office: {$oldOffice} → {$mr->office}.";
+            }
+            if ($oldPosition !== $mr->position) {
+                $desc .= " Position: {$oldPosition} → {$mr->position}.";
+            }
+            $desc .= " Note: {$validated['note']}";
+
+            MRAuditLog::logAction(
+                $mr->id,
+                'transferred',
+                $desc
+            );
+
+            DB::commit();
+
+            return $this->ok('Memorandum Receipt transferred successfully', [
+                'mr_number' => $mr->mr_number,
+                'id' => $mr->id,
+                'accountable_officer' => $mr->accountable_officer,
+                'office' => $mr->office,
+                'position' => $mr->position,
+            ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error('Failed to transfer Memorandum Receipt: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Get audit log for a specific MR
      */
     public function auditLog(Request $request, int $id): JsonResponse
@@ -560,6 +696,11 @@ class MemorandumReceiptController extends Controller
 
         if (!$mr) {
             return $this->notFound('Memorandum Receipt not found');
+        }
+
+        // Check authorization
+        if (!$this->canViewMR($request->user(), $mr)) {
+            return $this->unauthorized('Not authorized to view this Memorandum Receipt audit log');
         }
 
         $logs = $mr->auditLogs()->paginate(50);
@@ -603,24 +744,35 @@ class MemorandumReceiptController extends Controller
      */
     private function canViewMR($user, MemorandumReceipt $mr): bool
     {
-        // Admin, supply officer, and creator can view any MR
-        // Staff can view MRs they created
+        // Admin, supply officer, property_custodia can view any MR
+        // Users can view MRs they created
+        // Accountable officer can view their issued MR
         $userRoleStr = strtolower($user->role ?? '');
-        return in_array($userRoleStr, ['admin', 'supply_officer', 'supply officer'])
-            || $user->id === $mr->created_by;
+        if (in_array($userRoleStr, ['admin', 'supply_officer', 'supply officer', 'property_custodia'])) {
+            return true;
+        }
+
+        if ($user->id === $mr->created_by) {
+            return true;
+        }
+
+        return strcasecmp((string) $mr->accountable_officer, (string) ($user->name ?? '')) === 0;
     }
 
     private function canEditMR($user, MemorandumReceipt $mr): bool
     {
         $userRoleStr = strtolower($user->role ?? '');
         $isAdmin = in_array($userRoleStr, ['admin', 'supply_officer', 'supply officer']);
-        return ($isAdmin || $user->id === $mr->created_by) && $mr->isEditable();
+        $isPropertyCustodia = $userRoleStr === 'property_custodia';
+        return (($isAdmin || ($isPropertyCustodia && $user->id === $mr->created_by)) && $mr->isEditable()) 
+            || ($user->id === $mr->created_by && $mr->isEditable());
     }
 
     private function canDeleteMR($user, MemorandumReceipt $mr): bool
     {
         $userRoleStr = strtolower($user->role ?? '');
-        return in_array($userRoleStr, ['admin', 'supply_officer', 'supply officer']) || $user->id === $mr->created_by;
+        $isManagement = in_array($userRoleStr, ['admin', 'supply_officer', 'supply officer']);
+        return $isManagement || $user->id === $mr->created_by;
     }
 
     /**
@@ -629,7 +781,7 @@ class MemorandumReceiptController extends Controller
     public function exportPDF(Request $request, int $id)
     {
         try {
-            $mr = MemorandumReceipt::with(['items.inventoryItem', 'office', 'officer'])->find($id);
+            $mr = MemorandumReceipt::with(['items'])->find($id);
 
             if (!$mr) {
                 return response()->json(['message' => 'Memorandum Receipt not found'], 404);

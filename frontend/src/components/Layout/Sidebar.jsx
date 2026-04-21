@@ -1,5 +1,5 @@
 // src/components/Layout/Sidebar.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Drawer,
@@ -35,13 +35,13 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
   const location = useLocation();
   const drawerWidth = 280;
 
-  const getNavItems = () => {
+  const navItems = useMemo(() => {
     const baseItems = [
       {
         path: '/dashboard',
         icon: <DashboardIcon />,
         label: 'Dashboard',
-        roles: ['admin', 'supply_officer', 'staff']
+        roles: ['admin', 'supply_officer', 'property_custodia', 'staff']
       },
     ];
 
@@ -55,6 +55,7 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         { path: '/memorandum-receipts', icon: <PurchaseIcon />, label: 'Memorandum Receipts', roles: ['admin'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['admin'] },
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['admin'] },
+        { path: '/received-supplies-log', icon: <CheckIcon />, label: 'Received Supplies Log', roles: ['admin'] },
         { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['admin'] },
       ];
     }
@@ -62,32 +63,43 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
     if (user?.role === 'supply_officer') {
       return [
         ...baseItems,
+        { path: '/locations', icon: <OfficeIcon />, label: 'Locations', roles: ['supply_officer'] },
+        { path: '/users', icon: <UsersIcon />, label: 'Manage Users', roles: ['supply_officer'] },
+        { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['supply_officer'] },
+        { path: '/categories', icon: <CategoryIcon />, label: 'Categories', roles: ['supply_officer'] },
         { path: '/memorandum-receipts', icon: <PurchaseIcon />, label: 'Memorandum Receipts', roles: ['supply_officer'] },
         { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Requests', roles: ['supply_officer'] },
-        { path: '/items', icon: <ItemsIcon />, label: 'Items & Inventory', roles: ['supply_officer'] },
         { path: '/stock-movements', icon: <HistoryIcon />, label: 'Stock Movements', roles: ['supply_officer'] },
+        { path: '/received-supplies-log', icon: <CheckIcon />, label: 'Received Supplies Log', roles: ['supply_officer'] },
         { path: '/reports', icon: <ReportsIcon />, label: 'Reports', roles: ['supply_officer'] },
       ];
     }
 
-    if (user?.role === 'staff') {
+    if (user?.role === 'property_custodia') {
+      return [
+        ...baseItems,
+        { path: '/available-items', icon: <CartIcon />, label: 'Browse Items', roles: ['property_custodia'] },
+        { path: '/memorandum-receipts', icon: <PurchaseIcon />, label: 'Memorandum Receipts', roles: ['property_custodia'] },
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Items', roles: ['property_custodia'] },
+      ];
+    }
+
+    if (['staff', 'faculty'].includes((user?.role || '').toLowerCase())) {
       return [
         {
           path: '/staff-dashboard',
           icon: <DashboardIcon />,
           label: 'My Dashboard',
-          roles: ['staff']
+          roles: ['staff', 'faculty']
         },
-        { path: '/available-items', icon: <CartIcon />, label: 'Browse Items', roles: ['staff'] },
-        { path: '/request-item', icon: <AddIcon />, label: 'Request Item', roles: ['staff'] },
-        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Items', roles: ['staff'] },
+        { path: '/available-items', icon: <CartIcon />, label: 'Browse Items', roles: ['staff', 'faculty'] },
+        { path: '/request-item', icon: <AddIcon />, label: 'Request Item', roles: ['staff', 'faculty'] },
+        { path: '/borrows', icon: <BorrowIcon />, label: 'Borrow Items', roles: ['staff', 'faculty'] },
       ];
     }
 
     return baseItems;
-  };
-
-  const navItems = getNavItems();
+  }, [user?.role]);
 
   const drawer = (
     <Box sx={{ height: '100%', background: 'linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)' }}>
@@ -111,7 +123,8 @@ const Sidebar = ({ mobileOpen, onMenuToggle, isMobile }) => {
         <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0' }}>
           <Typography variant="subtitle2" fontWeight="bold" color="#006400" fontSize="0.8rem">
             {user.role === 'admin' ? 'Administrator' :
-              user.role === 'supply_officer' ? 'Supply Officer' : 'Staff'}
+              user.role === 'supply_officer' ? 'Supply Officer' :
+              user.role === 'property_custodia' ? 'Property Custodian' : 'Staff'}
           </Typography>
           <Typography variant="body2" color="text.secondary" fontSize="0.75rem">
             {user.name}

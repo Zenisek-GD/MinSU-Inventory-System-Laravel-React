@@ -245,7 +245,7 @@ export default function AddStockMovementDialog({ open, onClose, onSuccess }) {
                   >
                     {offices.map(office => (
                       <MenuItem key={office.id} value={office.id}>
-                        {office.name}
+                        {office.room_id ? `${office.room_id} — ` : ''}{office.name}
                       </MenuItem>
                     ))}
                   </Select>
@@ -267,7 +267,7 @@ export default function AddStockMovementDialog({ open, onClose, onSuccess }) {
                   >
                     {offices.map(office => (
                       <MenuItem key={office.id} value={office.id}>
-                        {office.name}
+                        {office.room_id ? `${office.room_id} — ` : ''}{office.name}
                       </MenuItem>
                     ))}
                   </Select>

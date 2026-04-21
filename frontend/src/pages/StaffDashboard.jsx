@@ -4,6 +4,7 @@ import DashboardLayout from '../components/Layout/DashboardLayout';
 import { fetchMemorandumReceipts } from '../api/memorandumReceipt';
 import { getMyBorrowRequests } from '../api/borrowRequests';
 import { fetchItems } from '../api/item';
+import { fetchDashboardMrTimeline } from '../api/dashboard';
 import { useUser } from '../context/UserContext';
 import {
   Box,
@@ -33,6 +34,7 @@ import {
   ShoppingCart as CartIcon,
   Inventory as ItemsIcon,
   Assignment as RequestIcon,
+  Description as TimelineIcon,
 } from '@mui/icons-material';
 import OfficeChip from '../components/UI/OfficeChip';
 import PrimaryButton from '../components/UI/PrimaryButton';
@@ -45,6 +47,7 @@ export default function StaffDashboardPage() {
   const [memoRequests, setMemoRequests] = useState([]);
   const [borrowRequests, setBorrowRequests] = useState([]);
   const [availableItems, setAvailableItems] = useState([]);
+  const [mrTimeline, setMrTimeline] = useState([]);
 
   useEffect(() => {
     loadAllData();
@@ -83,6 +86,15 @@ export default function StaffDashboardPage() {
       } catch (e) {
         console.warn('Failed to load items:', e);
         itemsList = [];
+      }
+
+      // Load MR timeline (recent audit log entries)
+      try {
+        const tl = await fetchDashboardMrTimeline({ limit: 10 });
+        setMrTimeline(Array.isArray(tl) ? tl : []);
+      } catch (e) {
+        console.warn('Failed to load MR timeline:', e);
+        setMrTimeline([]);
       }
 
       setMemoRequests(memoList);
@@ -143,6 +155,7 @@ export default function StaffDashboardPage() {
   const handleRequestItem = () => navigate('/request-item');
   const handleBorrowItem = () => navigate('/borrows');
   const handleViewAllRequests = () => navigate('/my-requests');
+  const handleViewTimeline = (mrId) => navigate(`/memorandum-receipts/${mrId}`);
 
   return (
     <DashboardLayout>
@@ -301,6 +314,74 @@ export default function StaffDashboardPage() {
                 </Card>
               </Grid>
             </Grid>
+
+            {/* Recent MR Timeline */}
+            <Card sx={{ borderRadius: 2, mb: 4 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
+                  <Box>
+                    <Typography variant="h6" fontWeight={800} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TimelineIcon sx={{ fontSize: 20 }} /> Recent MR Timeline
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Latest updates on your memorandum receipts
+                    </Typography>
+                  </Box>
+                  <Button size="small" variant="outlined" onClick={handleViewAllRequests}>
+                    View All
+                  </Button>
+                </Box>
+
+                {mrTimeline.length === 0 ? (
+                  <Alert severity="info">No timeline activity yet.</Alert>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 800 }}>MR</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>Update</TableCell>
+                          <TableCell sx={{ fontWeight: 800 }}>When</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {mrTimeline.map((log) => (
+                          <TableRow key={log.id} hover>
+                            <TableCell sx={{ fontWeight: 700 }}>
+                              {log.mr_number ? `MR#${log.mr_number}` : `MR#${log.mr_id}`}
+                              {log.mr_status && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  {log.mr_status}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600}>
+                                {log.description || log.action}
+                              </Typography>
+                              {log.user_name && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  By: {log.user_name}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                              {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                            </TableCell>
+                            <TableCell align="right">
+                              <Button size="small" variant="outlined" onClick={() => handleViewTimeline(log.mr_id)}>
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Quick Actions */}
             <Card sx={{ mb: 4, borderRadius: 2, background: 'linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%)' }}>

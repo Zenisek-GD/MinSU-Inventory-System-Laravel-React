@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -35,6 +35,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DocumentScannerIcon from '@mui/icons-material/DocumentScanner';
+import { useUser } from '../context/UserContext';
 
 /**
  * MemorandumReceiptForm — Reusable MR Form Component
@@ -60,12 +61,19 @@ const MemorandumReceiptForm = React.forwardRef(({
   items = [],
   offices = [],
   users = [],
+  initialValues = null,
+  initialItems = null,
   onSubmit,
+  onCancel,
   submitButtonText = 'Create MR',
   isLoading = false,
   variant = 'full'
 }, ref) => {
   const PAR_THRESHOLD = 50000;
+  const { user } = useUser();
+  const isStaffCompact = variant === 'compact' && user?.role === 'staff';
+
+  const itemNameOptions = useMemo(() => items.map((item) => item.name), [items]);
 
   // Form type tracking
   const [formType, setFormType] = useState('ics');
@@ -90,38 +98,69 @@ const MemorandumReceiptForm = React.forwardRef(({
   ];
 
   // Form data state
-  const [formData, setFormData] = useState({
-    entity_name: 'Mindoro State University',
-    fund_cluster: 'General Fund',
-    office: '',
-    accountable_officer: '',
-    position: 'Staff',
-    date_issued: new Date().toISOString().split('T')[0],
-    received_from: 'Direct Purchase',
-    purpose: '',
-    notes: '',
+  const [formData, setFormData] = useState(() => {
+    const defaults = {
+      entity_name: 'Mindoro State University',
+      fund_cluster: 'General Fund',
+      office: '',
+      accountable_officer: '',
+      position: 'Staff',
+      date_issued: new Date().toISOString().split('T')[0],
+      received_from: 'Direct Purchase',
+      purpose: '',
+      notes: '',
+    };
+    return { ...defaults, ...(initialValues || {}) };
   });
 
   // Items list state
-  const [itemsList, setItemsList] = useState([]);
+  const [itemsList, setItemsList] = useState(() => {
+    if (!Array.isArray(initialItems) || initialItems.length === 0) return [];
+    return initialItems.map((item, idx) => ({ ...item, id: idx + 1 }));
+  });
 
   // Item dialog state
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
   const [itemFormData, setItemFormData] = useState({
+    item_id: null,
     item_name: '',
-    item_type: '',
+    item_type: 'equipment',
     qty: '',
-    unit: '',
+    unit: 'pcs',
     property_number: '',
-    acquisition_date: '',
+    acquisition_date: new Date().toISOString().split('T')[0],
     unit_cost: '',
-    condition: '',
+    condition: 'Good',
     remarks: '',
     estimated_useful_life: '',
   });
 
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (variant !== 'compact') return;
+    if (!user) return;
+
+    const userOfficeName = user?.office?.name || user?.office?.office_name || '';
+    setFormData((prev) => ({
+      ...prev,
+      office: prev.office || userOfficeName,
+      accountable_officer: prev.accountable_officer || user?.name || '',
+    }));
+  }, [user, variant]);
+
+  useEffect(() => {
+    if (!initialValues) return;
+    setFormData((prev) => ({ ...prev, ...initialValues }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(initialValues || {})]);
+
+  useEffect(() => {
+    if (!Array.isArray(initialItems)) return;
+    setItemsList(initialItems.map((item, idx) => ({ ...item, id: idx + 1 })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(initialItems || [])]);
 
   // Handle main form input change
   const handleFormChange = (e) => {
@@ -142,7 +181,9 @@ const MemorandumReceiptForm = React.forwardRef(({
       if (selectedItem) {
         setItemFormData((prev) => ({
           ...prev,
+          item_id: selectedItem.id,
           item_name: selectedItem.name,
+          item_type: selectedItem.item_type || prev.item_type || 'equipment',
           unit_cost: selectedItem.unit_cost || 0,
           property_number: selectedItem.qr_code || '',
           unit: selectedItem.unit || 'pcs',
@@ -185,15 +226,17 @@ const MemorandumReceiptForm = React.forwardRef(({
       setItemFormData(item);
     } else {
       setEditingItemId(null);
+      const today = new Date().toISOString().split('T')[0];
       setItemFormData({
+        item_id: null,
         item_name: '',
-        item_type: '',
-        qty: '',
-        unit: '',
+        item_type: 'equipment',
+        qty: isStaffCompact ? 1 : '',
+        unit: 'pcs',
         property_number: '',
-        acquisition_date: '',
+        acquisition_date: today,
         unit_cost: '',
-        condition: '',
+        condition: 'Good',
         remarks: '',
         estimated_useful_life: '',
       });
@@ -214,12 +257,10 @@ const MemorandumReceiptForm = React.forwardRef(({
       return;
     }
 
-    if (itemFormData.item_type === 'equipment' && !itemFormData.property_number) {
-      setError('Property number is required for equipment items');
-      return;
-    }
-
     const updatedItem = { ...itemFormData };
+    if (!updatedItem.property_number) {
+      updatedItem.property_number = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
     let updatedList;
 
     if (editingItemId) {
@@ -282,6 +323,12 @@ const MemorandumReceiptForm = React.forwardRef(({
       form_type: formType,
       items: itemsList.map(({ id, ...rest }) => rest),
     };
+
+    // Staff should not be able to impersonate other users/roles
+    if (isStaffCompact) {
+      submitData.accountable_officer = user?.name || submitData.accountable_officer;
+      submitData.position = 'Staff';
+    }
 
     if (onSubmit) {
       onSubmit(submitData);
@@ -496,7 +543,7 @@ const MemorandumReceiptForm = React.forwardRef(({
                     return (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Typography variant="body2" fontWeight={600}>
-                          {selectedOffice.name || selectedOffice.office_name}
+                          {selectedOffice.room_id ? `${selectedOffice.room_id} — ` : ''}{selectedOffice.name || selectedOffice.office_name}
                         </Typography>
                         {location && (
                           <Typography variant="caption" color="text.secondary">
@@ -521,7 +568,7 @@ const MemorandumReceiptForm = React.forwardRef(({
                       >
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Typography variant="body2" fontWeight={600}>
-                            {office.name || office.office_name}
+                            {office.room_id ? `${office.room_id} — ` : ''}{office.name || office.office_name}
                           </Typography>
                           {location && (
                             <Typography variant="caption" color="text.secondary">
@@ -538,69 +585,93 @@ const MemorandumReceiptForm = React.forwardRef(({
 
             {/* Accountable Officer */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Accountable Officer</InputLabel>
-                <Select
-                  name="accountable_officer"
-                  value={formData.accountable_officer}
-                  onChange={handleFormChange}
+              {isStaffCompact ? (
+                <TextField
+                  fullWidth
+                  required
                   label="Accountable Officer"
-                  renderValue={(selected) => {
-                    const selectedUser = users.find(u => u.name === selected);
-                    if (!selectedUser) return selected;
-                    return (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                          {selectedUser.name}
-                        </Typography>
-                        {selectedUser.role && (
-                          <Typography variant="caption" color="text.secondary">
-                            👤 {selectedUser.role}
+                  name="accountable_officer"
+                  value={user?.name || formData.accountable_officer}
+                  InputProps={{ readOnly: true }}
+                  helperText="Automatically set from your account"
+                />
+              ) : (
+                <FormControl fullWidth required>
+                  <InputLabel>Accountable Officer</InputLabel>
+                  <Select
+                    name="accountable_officer"
+                    value={formData.accountable_officer}
+                    onChange={handleFormChange}
+                    label="Accountable Officer"
+                    renderValue={(selected) => {
+                      const selectedUser = users.find(u => u.name === selected);
+                      if (!selectedUser) return selected;
+                      return (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {selectedUser.name}
                           </Typography>
-                        )}
-                      </Box>
-                    );
-                  }}
-                >
-                  {users.map((u) => (
-                    <MenuItem
-                      key={u.id}
-                      value={u.name}
-                      sx={{ whiteSpace: 'normal' }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                          {u.name}
-                        </Typography>
-                        {u.role && (
-                          <Typography variant="caption" color="text.secondary">
-                            👤 {u.role}
+                          {selectedUser.role && (
+                            <Typography variant="caption" color="text.secondary">
+                              👤 {selectedUser.role}
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    }}
+                  >
+                    {users.map((u) => (
+                      <MenuItem
+                        key={u.id}
+                        value={u.name}
+                        sx={{ whiteSpace: 'normal' }}
+                      >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {u.name}
                           </Typography>
-                        )}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                          {u.role && (
+                            <Typography variant="caption" color="text.secondary">
+                              👤 {u.role}
+                            </Typography>
+                          )}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
             </Grid>
 
             {/* Position */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Position</InputLabel>
-                <Select
-                  name="position"
-                  value={formData.position}
-                  onChange={handleFormChange}
+              {isStaffCompact ? (
+                <TextField
+                  fullWidth
+                  required
                   label="Position"
-                >
-                  {positions.map((pos) => (
-                    <MenuItem key={pos} value={pos}>
-                      {pos}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  name="position"
+                  value="Staff"
+                  InputProps={{ readOnly: true }}
+                  helperText="Automatically set from your role"
+                />
+              ) : (
+                <FormControl fullWidth required>
+                  <InputLabel>Position</InputLabel>
+                  <Select
+                    name="position"
+                    value={formData.position}
+                    onChange={handleFormChange}
+                    label="Position"
+                  >
+                    {positions.map((pos) => (
+                      <MenuItem key={pos} value={pos}>
+                        {pos}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
             </Grid>
 
             {/* Date Issued */}
@@ -804,23 +875,24 @@ const MemorandumReceiptForm = React.forwardRef(({
             {/* Item Name - with Autocomplete for free text entry */}
             <Grid item xs={12}>
               <Autocomplete
-                freeSolo
-                options={items.map((item) => item.name)}
+                freeSolo={!isStaffCompact}
+                options={itemNameOptions}
                 value={itemFormData.item_name}
                 onChange={(event, newValue) => {
-                  setItemFormData({ ...itemFormData, item_name: newValue || '' });
+                  handleItemFormChange({ target: { name: 'item_name', value: newValue || '' } });
                 }}
                 inputValue={itemFormData.item_name}
                 onInputChange={(event, newInputValue) => {
-                  setItemFormData({ ...itemFormData, item_name: newInputValue });
+                  handleItemFormChange({ target: { name: 'item_name', value: newInputValue } });
                 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="Item Name"
-                    placeholder="Select or type item name"
+                    placeholder={isStaffCompact ? 'Select an available item' : 'Select or type item name'}
                     required
                     fullWidth
+                    helperText={isStaffCompact ? 'Staff can only select from available items' : ''}
                   />
                 )}
               />
@@ -835,6 +907,7 @@ const MemorandumReceiptForm = React.forwardRef(({
                   value={itemFormData.item_type}
                   onChange={handleItemFormChange}
                   label="Item Type"
+                  disabled={isStaffCompact && !!itemFormData.item_id}
                 >
                   <MenuItem value="equipment">Equipment</MenuItem>
                   <MenuItem value="consumable">Consumable</MenuItem>
@@ -866,6 +939,7 @@ const MemorandumReceiptForm = React.forwardRef(({
                   value={itemFormData.unit}
                   onChange={handleItemFormChange}
                   label="Unit"
+                  disabled={isStaffCompact && !!itemFormData.item_id}
                 >
                   {units.map((u) => (
                     <MenuItem key={u} value={u}>
@@ -887,21 +961,34 @@ const MemorandumReceiptForm = React.forwardRef(({
                 onChange={handleItemFormChange}
                 inputProps={{ min: 0, step: 0.01 }}
                 required
+                disabled={isStaffCompact && !!itemFormData.item_id}
+                helperText={isStaffCompact && !!itemFormData.item_id ? 'Auto-filled from inventory item' : ''}
               />
             </Grid>
 
             {/* Property Number (for equipment) */}
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Property Number"
-                name="property_number"
-                value={itemFormData.property_number}
-                onChange={handleItemFormChange}
-                required={itemFormData.item_type === 'equipment'}
-                error={itemFormData.item_type === 'equipment' && !itemFormData.property_number}
-                helperText={itemFormData.item_type === 'equipment' && !itemFormData.property_number ? 'Required for equipment' : ''}
-              />
+              {isStaffCompact ? (
+                <TextField
+                  fullWidth
+                  label="Property Number"
+                  name="property_number"
+                  value={itemFormData.property_number || 'Auto-generated on save'}
+                  InputProps={{ readOnly: true }}
+                  helperText={itemFormData.item_id ? 'From selected inventory item' : 'Automatically generated'}
+                />
+              ) : (
+                <TextField
+                  fullWidth
+                  label="Property Number"
+                  name="property_number"
+                  value={itemFormData.property_number}
+                  onChange={handleItemFormChange}
+                  required={itemFormData.item_type === 'equipment'}
+                  error={itemFormData.item_type === 'equipment' && !itemFormData.property_number}
+                  helperText={itemFormData.item_type === 'equipment' && !itemFormData.property_number ? 'Required for equipment' : ''}
+                />
+              )}
             </Grid>
 
             {/* Acquisition Date */}
@@ -985,9 +1072,9 @@ const MemorandumReceiptForm = React.forwardRef(({
           variant="outlined"
           sx={{ borderColor: '#999', color: '#666', p: 1.5, fontSize: '1rem', fontWeight: 600 }}
           onClick={() => {
-            // Reset form or close dialog if in compact mode
-            if (variant === 'compact') {
-              window.history.back();
+            if (typeof onCancel === 'function') {
+              onCancel();
+              return;
             }
           }}
         >

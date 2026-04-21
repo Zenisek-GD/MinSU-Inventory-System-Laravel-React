@@ -11,8 +11,8 @@ class CreateMemorandumReceiptRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Users with Admin or Supply Officer role can create MRs
-        return $this->user()->role === 'Admin' || $this->user()->role === 'Supply Officer';
+        // Users with Admin, Supply Officer, or Property Custodia role can create MRs
+        return in_array($this->user()->role, ['Admin', 'Supply Officer', 'property_custodia', 'admin', 'supply_officer']);
     }
 
     /**

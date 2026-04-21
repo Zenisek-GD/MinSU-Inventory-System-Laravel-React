@@ -4,10 +4,31 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Item extends Model
 {
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::creating(function (Item $item) {
+            if (!filled($item->serial_number)) {
+                $item->serial_number = self::generateUniqueSerialNumber();
+            }
+        });
+    }
+
+    public static function generateUniqueSerialNumber(): string
+    {
+        // Format: SN-YYYYMMDD-XXXXXX
+        // Keep it short, readable, and unique without requiring an extra DB migration.
+        do {
+            $serial = 'SN-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
+        } while (self::where('serial_number', $serial)->exists());
+
+        return $serial;
+    }
 
     protected $fillable = [
         'name',

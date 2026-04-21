@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from 'react-dom/client';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchMemorandumReceipts,
   createMemorandumReceipt,
@@ -40,6 +41,7 @@ import {
   Pending as PendingIcon,
   Cancel as CancelIcon,
   Print as PrintIcon,
+  Description as DescriptionIcon,
 } from "@mui/icons-material";
 import OfficeChip from '../components/UI/OfficeChip';
 import PrimaryButton from '../components/UI/PrimaryButton';
@@ -68,7 +70,7 @@ const defaultItem = {
 };
 
 // Request Card Component for Memorandum Receipts
-const RequestCard = ({ req, type, onDelete, getStatusColor, getStatusIcon, issueMemorandumReceipt, setRequests, showSnackbar }) => {
+const RequestCard = ({ req, onDelete, getStatusColor, getStatusIcon, onViewTimeline }) => {
   return (
     <Card sx={{ borderRadius: 2 }}>
       <CardContent>
@@ -112,6 +114,15 @@ const RequestCard = ({ req, type, onDelete, getStatusColor, getStatusIcon, issue
         {/* Actions */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {/* Removed Draft submit-for-approval flow. MR goes directly to Pending Review now */}
+
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<DescriptionIcon />}
+            onClick={() => onViewTimeline?.(req.id)}
+          >
+            View Timeline
+          </Button>
 
           {(req.status === 'Pending Review' || req.status === 'Returned') && (
             <Button
@@ -190,6 +201,7 @@ const BorrowRequestCard = ({ req, getStatusColor, getStatusIcon, borrowerName })
 
 export default function MyRequestsPage() {
   const { user } = useUser();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [borrowRequests, setBorrowRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -247,7 +259,10 @@ export default function MyRequestsPage() {
 
       // Load memorandum receipts
       try {
-        const memoResp = await fetchMemorandumReceipts({ requested_by: user?.id });
+        // Backend scopes results for non-management users to:
+        // - MRs they created, OR
+        // - MRs where they are the accountable officer
+        const memoResp = await fetchMemorandumReceipts();
         memoList = Array.isArray(memoResp) ? memoResp : [];
       } catch (e) {
         console.warn('Failed to load memorandum receipts:', e);
@@ -263,8 +278,7 @@ export default function MyRequestsPage() {
         borrowList = [];
       }
 
-      const myMemo = memoList.filter((r) => ((r.requestedBy && r.requestedBy.id === user.id) || r.requested_by === user.id));
-      setRequests(myMemo);
+      setRequests(memoList);
       setBorrowRequests(borrowList);
       setError(null);
     } catch (e) {
@@ -420,6 +434,7 @@ export default function MyRequestsPage() {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "completed":
+      case "turned in":
       case "approved":
       case "borrowed":
         return "success";
@@ -445,6 +460,7 @@ export default function MyRequestsPage() {
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
       case "completed":
+      case "turned in":
       case "approved":
       case "borrowed":
         return <CheckIcon sx={{ fontSize: 16 }} />;
@@ -749,9 +765,7 @@ export default function MyRequestsPage() {
                           onDelete={handleDelete}
                           getStatusColor={getStatusColor}
                           getStatusIcon={getStatusIcon}
-                          issueMemorandumReceipt={issueMemorandumReceipt}
-                          setRequests={setRequests}
-                          showSnackbar={showSnackbar}
+                          onViewTimeline={(id) => navigate(`/memorandum-receipts/${id}`)}
                         />
                       </Grid>
                     ))}
@@ -788,9 +802,7 @@ export default function MyRequestsPage() {
                         onDelete={handleDelete}
                         getStatusColor={getStatusColor}
                         getStatusIcon={getStatusIcon}
-                        issueMemorandumReceipt={issueMemorandumReceipt}
-                        setRequests={setRequests}
-                        showSnackbar={showSnackbar}
+                        onViewTimeline={(id) => navigate(`/memorandum-receipts/${id}`)}
                       />
                     </Grid>
                   ))
